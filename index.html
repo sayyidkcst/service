@@ -52,6 +52,11 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .act a svg{width:22px;height:22px;fill:currentColor;flex:0 0 auto}.act a span{font:700 13px inherit}.act a.wa{background:#25d366;color:#fff}
 .act a.alt{background:color-mix(in srgb,var(--acc2) 14%,transparent);color:var(--acc)}
 .act a:active{transform:scale(.97)}
+:root[data-theme="dark"]{--bg:#0b1418;--card:#121f25;--fg:#e8f1f4;--mut:#8fa5af;--line:#1f3139;--acc:#14b8a6;--acc2:#2dd4bf;--hd1:#0b3b38;--hd2:#0f766e}
+.set{margin-top:18px}.set h3{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}.avrow{display:flex;align-items:center;gap:14px}.note{font-size:13px;color:var(--mut);margin-top:8px}
+.dots{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}.dots button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 2px var(--bg)}.dots button.on{border-color:var(--fg)}
+.about{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card);line-height:1.5}.about .lg{font-size:26px}.about b{display:block;font-size:16px}.about span{display:block;color:var(--mut);font-size:14px}
+.tab img.av{width:24px;height:24px;border-radius:50%;object-fit:cover;display:block}
 #sheet textarea{width:100%;margin-top:10px;min-height:84px;resize:vertical}
 .stars{display:flex;gap:6px;margin:8px 0 2px}.stars button{border:0;background:none;font-size:36px;line-height:1;color:var(--line);cursor:pointer;padding:0}.stars button.on{color:#f59e0b}
 .rvi{padding:12px 0;border-top:1px solid var(--line)}.rvi b{font-size:14px}.rvi .s{color:#f59e0b;font-size:14px;margin-left:6px}.rvi p{margin-top:4px;font-size:14px;white-space:pre-wrap;word-break:break-word}.rvi small{color:var(--mut);display:block;margin-top:2px}
@@ -159,6 +164,16 @@ async function sha(s){const b=await crypto.subtle.digest("SHA-256",new TextEncod
 const toast=t=>{const x=$("#toast");x.textContent=t;x.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>x.style.opacity=0,2400)};
 let me=null;try{me=JSON.parse(localStorage.getItem("nearby_user")||"null")}catch(e){}
 const saveMe=()=>{try{me?localStorage.setItem("nearby_user",JSON.stringify(me)):localStorage.removeItem("nearby_user")}catch(e){}};
+/* ---------- Theme ---------- */
+const ACC={teal:null,blue:{acc:"#2563eb",acc2:"#60a5fa",hd1:"#1e3a8a",hd2:"#2563eb"},purple:{acc:"#7c3aed",acc2:"#a78bfa",hd1:"#4c1d95",hd2:"#7c3aed"},rose:{acc:"#e11d48",acc2:"#fb7185",hd1:"#881337",hd2:"#e11d48"},orange:{acc:"#ea580c",acc2:"#fb923c",hd1:"#9a3412",hd2:"#ea580c"},green:{acc:"#16a34a",acc2:"#4ade80",hd1:"#14532d",hd2:"#16a34a"}};
+const ACC_DOT={teal:"#0f766e",blue:"#2563eb",purple:"#7c3aed",rose:"#e11d48",orange:"#ea580c",green:"#16a34a"};
+const getTheme=()=>{try{return Object.assign({mode:"auto",acc:"teal"},JSON.parse(localStorage.getItem("nearby_theme")||"{}"))}catch(e){return{mode:"auto",acc:"teal"}}};
+function applyTheme(t){
+  t=t||getTheme();const r=document.documentElement;
+  if(t.mode==="light"||t.mode==="dark")r.setAttribute("data-theme",t.mode);else r.removeAttribute("data-theme");
+  const a=ACC[t.acc];["acc","acc2","hd1","hd2"].forEach(k=>a?r.style.setProperty("--"+k,a[k]):r.style.removeProperty("--"+k))}
+const setTheme=o=>{const t=Object.assign(getTheme(),o);try{localStorage.setItem("nearby_theme",JSON.stringify(t))}catch(e){}applyTheme(t)};
+applyTheme();
 let loc=null,cat="all",items=[],comm=[],osmFail=false,busy=0;
 const cache=new Map();
 
@@ -385,7 +400,11 @@ function closeMod(){mod.classList.remove("on")}
 mod.onclick=e=>{if(e.target===mod)closeMod()};
 
 /* ---------- Login ---------- */
-const paintAcct=()=>$("#acct-l").textContent=me?me.name.split(" ")[0]:"Log in";
+function paintAcct(){
+  $("#acct-l").textContent=me?me.name.split(" ")[0]:"Log in";
+  const t=$("#acct"),sv=t.querySelector("svg");let im=t.querySelector("img.av");
+  if(me&&me.avatar){if(!im){im=new Image();im.className="av";im.alt="";t.insertBefore(im,sv)}im.src=me.avatar;sv.style.display="none"}
+  else{if(im)im.remove();sv.style.display=""}}
 function openAuth(next){
   let mode="in";
   openMod(`<h2>Welcome</h2><p class="sub">Log in with your mobile number to add places</p>
@@ -407,12 +426,57 @@ function openAuth(next){
       const h=await sha("swipe:"+mob+":"+pw);
       const r=mode==="up"?await rpc("signup",{p_mobile:mob,p_name:name,p_hash:h}):await rpc("login",{p_mobile:mob,p_hash:h});
       if(r.error){err.textContent=r.error;b.disabled=false;return}
-      me={id:r.id,name:r.name,mobile:mob,hash:h};saveMe();paintAcct();closeMod();toast("Welcome, "+me.name.split(" ")[0]);
+      me={id:r.id,name:r.name,mobile:mob,hash:h};saveMe();paintAcct();loadProfile();closeMod();toast("Welcome, "+me.name.split(" ")[0]);
       if(next)next();else render()
     }catch(e){err.textContent=e.message;b.disabled=false}}}
+const aboutHTML=()=>`<div class="about"><div class="lg">🏢</div><div><b>KCST Media Technology</b><span>Vadakummuri</span><span>Urangatiry (po)</span><span>673639</span></div></div>`;
+const avHTML=z=>me&&me.avatar?`<img src="${esc(me.avatar)}" alt="" style="width:${z}px;height:${z}px;border-radius:50%;object-fit:cover;flex:0 0 auto">`:`<div style="width:${z}px;height:${z}px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:grid;place-items:center;font:700 ${Math.round(z*.42)}px inherit;flex:0 0 auto">${esc((me&&me.name||"?").trim().charAt(0).toUpperCase())}</div>`;
+async function loadProfile(){
+  if(!me)return;
+  try{
+    const r=await fetch(`${URL_}/rest/v1/user_profiles?select=display_name,avatar_url&user_id=eq.${encodeURIComponent(me.id)}`,{headers:{apikey:KEY}});
+    if(!r.ok)return;const j=await r.json();
+    if(j[0]){if(j[0].display_name)me.name=j[0].display_name;me.avatar=j[0].avatar_url||"";saveMe();paintAcct()}
+  }catch(e){}}
+async function saveProfile(name,avatar){
+  const old=me.avatar;
+  const r=await rpc("set_profile",{p_mobile:me.mobile,p_hash:me.hash,p_name:name,p_avatar:avatar||""});
+  if(r&&r.error)throw new Error(r.error);
+  me.name=name;me.avatar=avatar||"";saveMe();paintAcct();
+  if(old&&old!==me.avatar){const ip=old.split("/object/public/media/")[1];if(ip)fetch(`${URL_}/storage/v1/object/media/${ip}`,{method:"DELETE",headers:{apikey:KEY}}).catch(()=>{})}}
+function openSettings(){
+  if(!me){openAuth(openSettings);return}
+  const th=getTheme();
+  openMod(`<h2>Settings</h2>
+    <div class="set"><h3>Profile picture</h3><div class="avrow">${avHTML(72)}<div style="flex:1"><label class="pick" for="s-img">📷 Change picture</label><input id="s-img" type="file" accept="image/*" hidden>${me.avatar?`<button class="btn alt sm" id="s-rm" style="margin-top:8px">Remove picture</button>`:""}</div></div></div>
+    <div class="set"><h3>User info</h3><input id="s-name" placeholder="Your name" maxlength="60" style="width:100%"><p class="note">Mobile number: +${esc(me.mobile)}</p><div class="err" id="s-err"></div><button class="btn full" id="s-save" style="margin-top:10px">Save</button></div>
+    <div class="set"><h3>Theme</h3><div class="sw" id="s-mode">${[["auto","Auto"],["light","Light"],["dark","Dark"]].map(([k,l])=>`<button data-m="${k}"${th.mode===k?' class="on"':""}>${l}</button>`).join("")}</div>
+      <div class="dots" id="s-acc">${Object.keys(ACC).map(k=>`<button data-a="${k}" aria-label="${k}" style="background:${ACC_DOT[k]}"${th.acc===k?' class="on"':""}></button>`).join("")}</div></div>
+    <div class="set"><h3>About</h3>${aboutHTML()}</div>
+    <button class="btn full alt" id="s-done" style="margin-top:16px">Done</button>`);
+  $("#s-name").value=me.name;
+  $("#s-done").onclick=closeMod;
+  $("#s-mode").onclick=e=>{const b=e.target.closest("button");if(!b)return;setTheme({mode:b.dataset.m});document.querySelectorAll("#s-mode button").forEach(x=>x.classList.toggle("on",x===b))};
+  $("#s-acc").onclick=e=>{const b=e.target.closest("button");if(!b)return;setTheme({acc:b.dataset.a});document.querySelectorAll("#s-acc button").forEach(x=>x.classList.toggle("on",x===b))};
+  $("#s-save").onclick=async()=>{
+    const err=$("#s-err"),name=$("#s-name").value.trim();err.textContent="";
+    if(!name){err.textContent="Enter your name";return}
+    const b=$("#s-save");b.disabled=true;
+    try{await saveProfile(name,me.avatar||"");toast("Saved");openSettings()}catch(e){err.textContent=e.message;b.disabled=false}};
+  $("#s-img").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;const err=$("#s-err");err.textContent="Uploading picture…";
+    try{
+      const blob=await toJpeg(f,320),path=`avatars/${me.id}/${Date.now()}.jpg`;
+      const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:blob});
+      if(!up.ok)throw new Error("Picture upload failed. Try again.");
+      await saveProfile(me.name,`${URL_}/storage/v1/object/public/media/${path}`);toast("Picture updated");openSettings()
+    }catch(er){err.textContent=er.message}};
+  if(me.avatar)$("#s-rm").onclick=async()=>{try{await saveProfile(me.name,"");openSettings()}catch(e){$("#s-err").textContent=e.message}}}
 $("#acct").onclick=()=>{
   if(!me){openAuth();return}
-  openMod(`<h2>${esc(me.name)}</h2><p class="sub">+${esc(me.mobile)}</p><button class="btn full" id="ml">My listings</button><button class="btn full alt" id="lo" style="margin-top:8px">Log out</button>`);
+  openMod(`<div style="display:flex;align-items:center;gap:14px;margin-top:4px">${avHTML(56)}<div style="min-width:0"><h2 style="margin:0">${esc(me.name)}</h2><p class="sub" style="margin:2px 0 0">+${esc(me.mobile)}</p></div></div><button class="btn full" id="ml" style="margin-top:16px">My listings</button><button class="btn full alt" id="st" style="margin-top:8px">⚙️ Settings</button><button class="btn full alt" id="ab" style="margin-top:8px">ℹ️ About</button><button class="btn full alt" id="lo" style="margin-top:8px">Log out</button>`);
+  $("#st").onclick=openSettings;
+  $("#ab").onclick=()=>{openMod(`<h2>About</h2><div style="margin-top:14px">${aboutHTML()}</div><button class="btn full alt" id="ab-x" style="margin-top:16px">Close</button>`);$("#ab-x").onclick=closeMod};
   $("#ml").onclick=openMine;
   $("#lo").onclick=()=>{me=null;saveMe();paintAcct();closeMod();render()}};
 
@@ -547,7 +611,7 @@ function confirmDel(id,name,after,img){
       if(ip)fetch(`${URL_}/storage/v1/object/media/${ip}`,{method:"DELETE",headers:{apikey:KEY}}).catch(()=>{});
       toast("Deleted");after?after():closeMod();loadComm().then(()=>{render();load()})}catch(e){toast(e.message)}}}
 
-paintAcct();
+paintAcct();loadProfile();
 $("#list").innerHTML='<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
 Promise.all([loadComm(),loadRatings()]).then(render);
 /* ---------- Swipe left/right to change category ---------- */
