@@ -48,10 +48,13 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .in small{display:block;color:var(--mut);font-size:12px;margin-top:4px;overflow-wrap:anywhere}
 .badge{display:inline-block;font:800 9.5px inherit;text-transform:uppercase;letter-spacing:.05em;color:#fff;background:linear-gradient(135deg,var(--acc),var(--acc2));border-radius:7px;padding:3px 7px}
 .act{display:flex;gap:8px;padding:12px 14px 14px}
-.act a{flex:1;text-align:center;text-decoration:none;font:700 14px inherit;padding:11px 10px;border-radius:13px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
-.act{flex-wrap:wrap}.act a{min-width:90px}.act a.wa{background:#25d366;color:#fff}
+.act a{flex:1;text-align:center;text-decoration:none;font:700 14px inherit;padding:11px 10px;border-radius:13px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:flex;align-items:center;justify-content:center;gap:5px}
+.act a svg{width:22px;height:22px;fill:currentColor;flex:0 0 auto}.act a span{font:700 13px inherit}.act a.wa{background:#25d366;color:#fff}
 .act a.alt{background:color-mix(in srgb,var(--acc2) 14%,transparent);color:var(--acc)}
 .act a:active{transform:scale(.97)}
+#sheet textarea{width:100%;margin-top:10px;min-height:84px;resize:vertical}
+.stars{display:flex;gap:6px;margin:8px 0 2px}.stars button{border:0;background:none;font-size:36px;line-height:1;color:var(--line);cursor:pointer;padding:0}.stars button.on{color:#f59e0b}
+.rvi{padding:12px 0;border-top:1px solid var(--line)}.rvi b{font-size:14px}.rvi .s{color:#f59e0b;font-size:14px;margin-left:6px}.rvi p{margin-top:4px;font-size:14px;white-space:pre-wrap;word-break:break-word}.rvi small{color:var(--mut);display:block;margin-top:2px}
 .empty{text-align:center;color:var(--mut);padding:44px 16px;font-size:14px;line-height:1.55}.empty .eg{font-size:44px;margin-bottom:8px}
 .sk{height:120px;border-radius:22px;background:var(--card);border:1px solid var(--line);margin-bottom:14px;animation:p 1.2s infinite alternate}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -64,8 +67,8 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .tab.plus{flex:0 0 70px;padding:0}
 .tab.plus b{display:grid;place-items:center;width:54px;height:54px;margin-top:-26px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-size:32px;font-weight:300;box-shadow:0 8px 22px #0f766e77;border:4px solid var(--bg)}
 .tab.plus:active b{transform:scale(.94)}
-input,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
-input:focus,select:focus{outline:2px solid var(--acc2);border-color:transparent}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc2);border-color:transparent}
 .btn{font:700 14px inherit;border:0;border-radius:13px;padding:0 16px;cursor:pointer;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;white-space:nowrap}
 .btn.alt{background:color-mix(in srgb,var(--acc2) 14%,transparent);color:var(--acc);border:0}
 .btn.full{width:100%;padding:14px;margin-top:8px}.btn.sm{padding:10px 14px;font-size:13px}.btn.red{background:var(--red)}
@@ -76,6 +79,8 @@ input:focus,select:focus{outline:2px solid var(--acc2);border-color:transparent}
 #mod.on{display:flex;animation:fi .18s}@keyframes fi{from{opacity:0}}
 #sheet{position:relative;width:100%;max-width:520px;max-height:88dvh;overflow-y:auto;background:var(--bg);border-radius:24px;padding:26px 18px 22px;box-shadow:0 20px 60px #0006;animation:up .22s cubic-bezier(.2,.9,.3,1)}
 #sheet::before{display:none}
+@keyframes swl{from{transform:translateX(40px);opacity:0}}@keyframes swr{from{transform:translateX(-40px);opacity:0}}
+#list.swl{animation:swl .25s}#list.swr{animation:swr .25s}
 @keyframes up{from{transform:scale(.94);opacity:0}}
 #sheet h2{font-size:22px;margin-bottom:4px;letter-spacing:-.01em}
 #sheet input,#sheet select{width:100%;margin-top:10px}
@@ -212,7 +217,7 @@ $("#refb").onclick=async()=>{
   const b=$("#refb"),v=b.firstElementChild;if(b.disabled)return;
   b.disabled=true;v.style.animation="spin .8s linear infinite";
   cache.clear();
-  try{await loadComm();if(loc)await load();else render()}catch(e){}
+  try{await Promise.all([loadComm(),loadRatings()]);if(loc)await load();else render()}catch(e){}
   v.style.animation="";b.disabled=false;toast("Refreshed")};
 $("#locb").onclick=()=>openLoc();
 async function goArea(){
@@ -272,6 +277,55 @@ const encMeta=(text,m)=>m&&(m[0]||m[1]||m[2])?text+"||"+m.join("|"):text;
 const hoursHTML=x=>`<div id="${x}-hrs" style="display:none"><div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:var(--mut)">Opening time<input id="${x}-open" type="time"></label><label style="flex:1;font-size:12px;color:var(--mut)">Closing time<input id="${x}-close" type="time"></label></div><select id="${x}-off"><option value="">Weekly off: none</option>${WD.map(d=>`<option value="${d}">Weekly off: ${d}</option>`).join("")}</select></div>`;
 const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),t=()=>h.style.display=c.value==="shop"?"block":"none";c.onchange=t;t()};
 const hoursVal=x=>$("#"+x+"-cat").value==="shop"?[$("#"+x+"-open").value,$("#"+x+"-close").value,$("#"+x+"-off").value]:["","",""];
+const IC={
+  dir:'<svg viewBox="0 0 24 24"><path d="M21.71 11.29l-9-9a1 1 0 0 0-1.41 0l-9 9a1 1 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a1 1 0 0 0 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/></svg>',
+  call:'<svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg>',
+  wa:'<svg viewBox="0 0 24 24"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.39-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.21 3.07.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.76-.72 2-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35zM12.05 21.79h-.01a9.87 9.87 0 0 1-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 0 1-1.51-5.26c0-5.45 4.44-9.88 9.89-9.88 2.64 0 5.12 1.03 6.99 2.9a9.82 9.82 0 0 1 2.89 6.99c0 5.45-4.44 9.88-9.88 9.88zM20.46 3.49A11.82 11.82 0 0 0 12.05 0C5.5 0 .16 5.34.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 0 0 5.69 1.45h.01c6.55 0 11.89-5.34 11.89-11.89 0-3.18-1.24-6.16-3.48-8.42z"/></svg>',
+  star:'<svg viewBox="0 0 24 24"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>'};
+const pkey=i=>i.comm?"c"+i.id:"o"+(+i.lat).toFixed(5)+","+(+i.lon).toFixed(5);
+const ratings={};
+const rinfo=k=>{const a=ratings[k];return a?{avg:a.s/a.n,n:a.n}:null};
+async function loadRatings(){
+  try{
+    const r=await fetch(`${URL_}/rest/v1/place_reviews?select=place_key,rating&limit=5000`,{headers:{apikey:KEY}});
+    if(!r.ok)return;
+    const o={};(await r.json()).forEach(x=>{const a=o[x.place_key]||(o[x.place_key]={n:0,s:0});a.n++;a.s+=x.rating});
+    Object.keys(ratings).forEach(k=>delete ratings[k]);Object.assign(ratings,o)
+  }catch(e){}}
+const starTxt=n=>"★".repeat(n)+"☆".repeat(5-n);
+async function openReviews(key,name){
+  openMod(`<h2>${esc(name)}</h2><p class="sub" id="rv-sum">Loading…</p><div id="rv-form"></div><div id="rv-list"></div>`);
+  let rows;
+  try{
+    const r=await fetch(`${URL_}/rest/v1/place_reviews?select=*&place_key=eq.${encodeURIComponent(key)}&order=created_at.desc&limit=100`,{headers:{apikey:KEY}});
+    if(!r.ok)throw new Error("x");rows=await r.json()
+  }catch(e){$("#rv-sum").textContent="Reviews are not available yet.";return}
+  const n=rows.length,avg=n?rows.reduce((a,x)=>a+x.rating,0)/n:0;
+  $("#rv-sum").innerHTML=n?`<span style="color:#f59e0b">★</span> <b>${avg.toFixed(1)}</b> · ${n} review${n>1?"s":""}`:"No reviews yet. Be the first!";
+  $("#rv-list").innerHTML=rows.map(x=>`<div class="rvi"><b>${esc(x.user_name||"User")}</b><span class="s">${starTxt(x.rating)}</span>${x.comment?`<p>${esc(x.comment)}</p>`:""}<small>${new Date(x.created_at).toLocaleDateString()}</small></div>`).join("");
+  const F=$("#rv-form");
+  if(!me){F.innerHTML=`<button class="btn full" id="rv-login">Log in to rate and comment</button>`;$("#rv-login").onclick=()=>openAuth(()=>openReviews(key,name));return}
+  const mine=rows.find(x=>String(x.user_id)===String(me.id));let sel=mine?mine.rating:0;
+  F.innerHTML=`<div class="stars" id="rv-st">${[1,2,3,4,5].map(v=>`<button data-s="${v}" aria-label="${v} star${v>1?"s":""}">★</button>`).join("")}</div>
+    <textarea id="rv-text" maxlength="500" placeholder="Write a comment (optional)"></textarea>
+    <div class="err" id="rv-err"></div>
+    <div class="two">${mine?`<button class="btn alt" id="rv-del">Delete mine</button>`:""}<button class="btn" id="rv-go">${mine?"Update":"Submit"}</button></div>`;
+  $("#rv-text").value=mine?mine.comment||"":"";
+  const paint=()=>document.querySelectorAll("#rv-st button").forEach(b=>b.classList.toggle("on",+b.dataset.s<=sel));paint();
+  $("#rv-st").onclick=e=>{const b=e.target.closest("button");if(!b)return;sel=+b.dataset.s;paint()};
+  const done=()=>{loadRatings().then(render);openReviews(key,name)};
+  $("#rv-go").onclick=async()=>{
+    const err=$("#rv-err");err.textContent="";
+    if(!sel){err.textContent="Tap a star to rate";return}
+    const b=$("#rv-go");b.disabled=true;
+    try{
+      const r=await rpc("add_review",{p_mobile:me.mobile,p_hash:me.hash,p_key:key,p_rating:sel,p_comment:$("#rv-text").value.trim(),p_name:me.name});
+      if(r&&r.error){err.textContent=r.error;b.disabled=false;return}
+      toast("Thanks for your review");done()
+    }catch(e){err.textContent=e.message;b.disabled=false}};
+  if(mine)$("#rv-del").onclick=async()=>{
+    try{const r=await rpc("delete_review",{p_mobile:me.mobile,p_hash:me.hash,p_key:key});if(r&&r.error){$("#rv-err").textContent=r.error;return}toast("Review deleted");done()}
+    catch(e){$("#rv-err").textContent=e.message}}}
 async function loadComm(){
   try{
     const res=await fetch(`${URL_}/rest/v1/places?select=*&order=created_at.desc&limit=1000`,{headers:{apikey:KEY}});
@@ -291,11 +345,12 @@ const waNum=p=>{let d=p.replace(/\D/g,"").replace(/^0+/,"");if(d.length===10)d="
 function card(i,k){
   const ph=(i.comm?i.phone:(i.t.phone||i.t["contact:phone"]||"")).split(";")[0].trim();
   const addr=i.comm?(i.address||""):[i.t["addr:housename"],i.t["addr:street"],i.t["addr:suburb"]||i.t["addr:city"]].filter(Boolean).join(", ");
-  const own=i.comm&&me&&i.user_id===me.id,c=i.cat||cat,ico=(CATS[c]||CATS.all).ico;
-  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div><div class="act"><a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener">Directions</a>${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}">Call</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener">WhatsApp</a>`:""}</div></div>`}
+  const own=i.comm&&me&&i.user_id===me.id,c=i.cat||cat,ico=(CATS[c]||CATS.all).ico,key=pkey(i),ri=rinfo(key);
+  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div><div class="act"><a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener" aria-label="Directions" title="Directions">${IC.dir}</a>${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}" aria-label="Call" title="Call">${IC.call}</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${IC.wa}</a>`:""}<a class="alt rv" href="#" data-rev="${esc(key)}" data-n="${esc(i.name||i.type)}" aria-label="Rate and comment" title="Rate and comment">${IC.star}${ri?`<span>${ri.avg.toFixed(1)}</span>`:""}</a></div></div>`}
 $("#list").onclick=e=>{
   const z=e.target.closest("[data-zoom]");
   if(z){openMod(`<img src="${esc(z.dataset.zoom)}" alt="" style="width:100%;border-radius:14px;margin-top:20px">`);return}
+  const rv=e.target.closest("[data-rev]");if(rv){e.preventDefault();openReviews(rv.dataset.rev,rv.dataset.n);return}
   const a=e.target.closest("[data-del]");if(!a)return;e.preventDefault();confirmDel(+a.dataset.del,a.dataset.n,null,a.dataset.img)};
 
 function render(){
@@ -494,7 +549,24 @@ function confirmDel(id,name,after,img){
 
 paintAcct();
 $("#list").innerHTML='<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
-loadComm().then(render);
+Promise.all([loadComm(),loadRatings()]).then(render);
+/* ---------- Swipe left/right to change category ---------- */
+(function(){
+  const keys=Object.keys(CATS);let sx=0,sy=0,st=0,ok=false;
+  document.addEventListener("touchstart",e=>{
+    ok=e.touches.length===1&&!mod.classList.contains("on")&&!e.target.closest("#chips,input,select,textarea,button,a,[data-zoom]");
+    if(ok){sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=Date.now()}},{passive:true});
+  document.addEventListener("touchend",e=>{
+    if(!ok)return;ok=false;
+    const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+    if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.5||Date.now()-st>800)return;
+    const n=keys.indexOf(cat)+(dx<0?1:-1);
+    if(n<0||n>=keys.length)return;
+    setCat(keys[n]);$("#f").value="";render();load();
+    const c=$("#chips"),b=c.querySelector('.chip[data-c="'+keys[n]+'"]');
+    if(b)c.scrollBy({left:b.getBoundingClientRect().left+b.offsetWidth/2-(c.getBoundingClientRect().left+c.clientWidth/2),behavior:"smooth"});
+    const l=$("#list");l.classList.remove("swl","swr");void l.offsetWidth;l.classList.add(dx<0?"swl":"swr")},{passive:true});
+})();
 useMe();
 </script>
 </body>
