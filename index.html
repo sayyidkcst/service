@@ -143,7 +143,8 @@ const CATS={
   transport:{label:"Vehicles and transport",ico:"🚕",q:['nwr["amenity"~"^(taxi|bus_station|car_rental|bicycle_rental|motorcycle_rental)$"]','nwr["highway"="bus_stop"]','nwr["railway"="station"]']},
   fuel:{label:"Fuel",ico:"⛽",q:['nwr["amenity"="fuel"]']},
   bank:{label:"Banks and ATMs",ico:"🏦",q:['nwr["amenity"~"^(bank|atm)$"]'],named:1},
-  food:{label:"Food",ico:"🍽️",q:['nwr["amenity"~"^(restaurant|cafe|fast_food)$"]'],named:1}
+  food:{label:"Food",ico:"🍽️",q:['nwr["amenity"~"^(restaurant|cafe|fast_food)$"]'],named:1},
+  other:{label:"Other",ico:"📌",q:[]}
 };
 const SERVERS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
 const URL_="https://jfkocwuaerxnmxuhlyok.supabase.co",KEY="sb_publishable_C6jmy7c8Q60PClOqawXtJg_RNbvR5B3";
@@ -156,8 +157,8 @@ const saveMe=()=>{try{me?localStorage.setItem("nearby_user",JSON.stringify(me)):
 let loc=null,cat="all",items=[],comm=[],osmFail=false,busy=0;
 const cache=new Map();
 
-const COL={all:"#0f766e",hospital:"#ef4444",pharmacy:"#10b981",police:"#3b82f6",fire:"#f97316",shop:"#8b5cf6",transport:"#eab308",fuel:"#64748b",bank:"#0ea5e9",food:"#ec4899"};
-const SHORT={all:"All",hospital:"Hospital",pharmacy:"Pharmacy",police:"Police",fire:"Fire",shop:"Shops",transport:"Vehicles",fuel:"Fuel",bank:"Banks",food:"Food"};
+const COL={all:"#0f766e",hospital:"#ef4444",pharmacy:"#10b981",police:"#3b82f6",fire:"#f97316",shop:"#8b5cf6",transport:"#eab308",fuel:"#64748b",bank:"#0ea5e9",food:"#ec4899",other:"#78716c"};
+const SHORT={all:"All",hospital:"Hospital",pharmacy:"Pharmacy",police:"Police",fire:"Fire",shop:"Shops",transport:"Vehicles",fuel:"Fuel",bank:"Banks",food:"Food",other:"Other"};
 $("#chips").innerHTML=Object.entries(CATS).map(([k,c])=>`<button class="chip${k===cat?" on":""}" data-c="${k}" style="--c:${COL[k]}"><span class="ci">${c.ico}</span>${SHORT[k]}</button>`).join("");
 $("#chips").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;setCat(b.dataset.c);$("#f").value="";render();load()};
 let sortTouched=false;
@@ -227,6 +228,7 @@ $("#t-ex").onclick=()=>$("#main").scrollTo({top:0,behavior:"smooth"});
 
 function setCat(k){cat=k;document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x.dataset.c===k))}
 async function fetchOSM(r){
+  if(cat!=="all"&&!CATS[cat].q.length)return [];
   const all=cat==="all",qs=all?Object.entries(CATS).filter(([k])=>k!=="all").flatMap(([,c])=>c.q):CATS[cat].q;
   const q=`[out:json][timeout:${all?40:25}];(${qs.map(x=>`${x}(around:${r},${loc.lat},${loc.lon});`).join("")});out center tags ${all?900:300};`;
   for(const u of SERVERS){
@@ -244,11 +246,24 @@ async function fetchOSM(r){
       return all?capAll(list):list
     }catch(e){}}
   return null}
+const WD=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const t12=t=>{if(!t)return"";const[h,m]=t.split(":").map(Number);return((h%12)||12)+":"+String(m).padStart(2,"0")+" "+(h<12?"AM":"PM")};
+function parseMeta(d){
+  d=String(d||"");const k=d.indexOf("||");
+  if(k<0)return{text:d,o:"",c:"",w:"",hrs:""};
+  const[o="",c="",w=""]=d.slice(k+2).split("|");
+  const parts=[];if(o&&c)parts.push(t12(o)+" – "+t12(c));else if(o)parts.push("Opens "+t12(o));else if(c)parts.push("Closes "+t12(c));
+  if(w)parts.push("Closed on "+w);
+  return{text:d.slice(0,k),o,c,w,hrs:parts.join(" · ")}}
+const encMeta=(text,m)=>m&&(m[0]||m[1]||m[2])?text+"||"+m.join("|"):text;
+const hoursHTML=x=>`<div id="${x}-hrs" style="display:none"><div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:var(--mut)">Opening time<input id="${x}-open" type="time"></label><label style="flex:1;font-size:12px;color:var(--mut)">Closing time<input id="${x}-close" type="time"></label></div><select id="${x}-off"><option value="">Weekly off: none</option>${WD.map(d=>`<option value="${d}">Weekly off: ${d}</option>`).join("")}</select></div>`;
+const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),t=()=>h.style.display=c.value==="shop"?"block":"none";c.onchange=t;t()};
+const hoursVal=x=>$("#"+x+"-cat").value==="shop"?[$("#"+x+"-open").value,$("#"+x+"-close").value,$("#"+x+"-off").value]:["","",""];
 async function loadComm(){
   try{
     const res=await fetch(`${URL_}/rest/v1/places?select=*&order=created_at.desc&limit=1000`,{headers:{apikey:KEY}});
     if(!res.ok)return;
-    comm=(await res.json()).map(p=>({comm:1,id:p.id,user_id:p.user_id,owner:p.owner_name,lat:p.lat,lon:p.lon,name:p.name,type:p.detail||(CATS[p.category]?CATS[p.category].label:"Place"),phone:p.phone,address:p.address,image:p.image_url,cat:p.category,created:p.created_at,t:{},d:null}))
+    comm=(await res.json()).map(p=>({comm:1,id:p.id,user_id:p.user_id,owner:p.owner_name,lat:p.lat,lon:p.lon,name:p.name,type:parseMeta(p.detail).text||(CATS[p.category]?CATS[p.category].label:"Place"),phone:p.phone,address:p.address,image:p.image_url,cat:p.category,created:p.created_at,t:{opening_hours:parseMeta(p.detail).hrs},d:null}))
   }catch(e){}}
 async function load(){
   if(!loc){render();return}
@@ -342,12 +357,13 @@ function openAdd(){
     <select id="a-cat">${Object.entries(CATS).filter(([k])=>k!=="all").map(([k,c])=>`<option value="${k}"${k===cat?" selected":""}>${c.ico} ${c.label}</option>`).join("")}</select>
     <input id="a-name" placeholder="Name (shop, hospital, vehicle owner)" maxlength="120">
     <input id="a-phone" type="tel" placeholder="Phone number" maxlength="30">
-    <input id="a-detail" placeholder="Details (e.g. Auto rickshaw, open 24 hours)" maxlength="200">
+    <input id="a-detail" placeholder="Details (e.g. Auto rickshaw, open 24 hours)" maxlength="200">${hoursHTML("a")}
     <input id="a-addr" placeholder="Address or landmark" maxlength="300">
     <label class="pick" for="a-img" id="a-pk">📷 Add a photo (optional)</label><input id="a-img" type="file" accept="image/*" hidden><img class="pv" id="a-pv" alt="">
     <div style="display:flex;gap:8px;margin-top:10px"><input id="a-find" placeholder="Search exact location, e.g. Areekode police station" style="margin-top:0;flex:1"><button class="btn sm" id="a-fb">Find</button></div>
     <div class="locrow"><span id="a-loc"></span><button class="btn alt sm" id="a-gps">Use my GPS</button></div>
     <div class="err" id="a-err"></div><button class="btn full" id="a-save">Save place</button>`);
+  wireHours("a");
   const showL=()=>$("#a-loc").innerHTML=aLoc?`📍 <a href="https://www.google.com/maps?q=${aLoc.lat},${aLoc.lon}" target="_blank" rel="noopener" style="color:var(--acc)">${aPlace?esc(aPlace):aLoc.lat.toFixed(5)+", "+aLoc.lon.toFixed(5)}</a>`:"📍 No location yet";
   showL();
   const doFind=async()=>{
@@ -378,13 +394,14 @@ function openAdd(){
         const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:aImg});
         if(!up.ok){err.textContent="Photo upload failed. Try again or save without a photo.";b.disabled=false;b.textContent="Save place";return}
         imgUrl=`${URL_}/storage/v1/object/public/media/${path}`}
-      const r=await rpc("add_place",{p_mobile:me.mobile,p_hash:me.hash,p_category:c,p_name:name,p_phone:$("#a-phone").value.trim(),p_detail:$("#a-detail").value.trim(),p_address:$("#a-addr").value.trim(),p_lat:aLoc.lat,p_lon:aLoc.lon,p_image:imgUrl});
+      const r=await rpc("add_place",{p_mobile:me.mobile,p_hash:me.hash,p_category:c,p_name:name,p_phone:$("#a-phone").value.trim(),p_detail:encMeta($("#a-detail").value.trim(),hoursVal("a")),p_address:$("#a-addr").value.trim(),p_lat:aLoc.lat,p_lon:aLoc.lon,p_image:imgUrl});
       if(r.error){err.textContent=r.error;b.disabled=false;b.textContent="Save place";return}
       loc={lat:aLoc.lat,lon:aLoc.lon};$("#where").textContent="📍 Showing "+name;
       setCat(c);closeMod();toast("Place added");loadComm().then(()=>{render();load()})
     }catch(e){err.textContent=e.message;b.disabled=false}}}
 $("#add").onclick=openAdd;
 
+const canDel=()=>!!me&&String(me.mobile).replace(/\D/g,"").endsWith("9633315177")&&String(me.name).trim().replace(/\s+/g," ").toUpperCase()==="SAYYID SHEREEF KC";
 let mineRows={};
 function getPos(ok,bad){
   const msg=e=>e&&e.code===1?"Location permission is blocked. Allow location for this site in your browser settings, then try again.":e&&e.code===2?"Location is unavailable. Turn on your phone's location (GPS) and try again.":"Location timed out. Move to an open area and try again.";
@@ -398,14 +415,14 @@ function openEdit(p){
     <select id="e-cat">${Object.entries(CATS).filter(([k])=>k!=="all").map(([k,c])=>`<option value="${k}">${c.ico} ${c.label}</option>`).join("")}</select>
     <input id="e-name" placeholder="Name" maxlength="120">
     <input id="e-phone" type="tel" placeholder="Phone number" maxlength="30">
-    <input id="e-detail" placeholder="Details" maxlength="200">
+    <input id="e-detail" placeholder="Details" maxlength="200">${hoursHTML("e")}
     <input id="e-addr" placeholder="Address or landmark" maxlength="300">
     <label class="pick" for="e-img" id="e-pk">📷 Change photo</label><input id="e-img" type="file" accept="image/*" hidden><img class="pv" id="e-pv" alt="">
     <div style="display:flex;gap:8px;margin-top:10px"><input id="e-find" placeholder="Search new location, e.g. Areekode police station" style="margin-top:0;flex:1"><button class="btn sm" id="e-fb">Find</button></div>
     <div class="locrow"><span id="e-loc"></span><button class="btn alt sm" id="e-gps">Use my GPS</button></div>
     <div class="err" id="e-err"></div>
     <div class="two"><button class="btn alt" id="e-cancel">Cancel</button><button class="btn" id="e-save">Save</button></div>`);
-  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";$("#e-detail").value=p.detail||"";$("#e-addr").value=p.address||"";
+  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";{const m=parseMeta(p.detail);$("#e-detail").value=m.text;$("#e-open").value=m.o;$("#e-close").value=m.c;$("#e-off").value=m.w}wireHours("e");$("#e-addr").value=p.address||"";
   let eLoc={lat:p.lat,lon:p.lon},ePlace="",eImg=null;
   if(p.image_url){const v=$("#e-pv");v.src=p.image_url;v.style.display="block"}else $("#e-pk").textContent="📷 Add a photo (optional)";
   $("#e-img").onchange=async e=>{
@@ -437,7 +454,7 @@ function openEdit(p){
         const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:eImg});
         if(!up.ok){err.textContent="Photo upload failed. Try again or save without changing the photo.";b.disabled=false;b.textContent="Save";return}
         imgUrl=`${URL_}/storage/v1/object/public/media/${path}`}
-      const r=await rpc("update_place",{p_mobile:me.mobile,p_hash:me.hash,p_id:p.id,p_category:$("#e-cat").value,p_name:name,p_phone:$("#e-phone").value.trim(),p_detail:$("#e-detail").value.trim(),p_address:$("#e-addr").value.trim(),p_lat:eLoc.lat,p_lon:eLoc.lon,p_image:imgUrl});
+      const r=await rpc("update_place",{p_mobile:me.mobile,p_hash:me.hash,p_id:p.id,p_category:$("#e-cat").value,p_name:name,p_phone:$("#e-phone").value.trim(),p_detail:encMeta($("#e-detail").value.trim(),hoursVal("e")),p_address:$("#e-addr").value.trim(),p_lat:eLoc.lat,p_lon:eLoc.lon,p_image:imgUrl});
       if(r&&r.error){err.textContent=r.error;b.disabled=false;b.textContent="Save";return}
       if(eImg&&p.image_url){const ip=p.image_url.split("/object/public/media/")[1];if(ip)fetch(`${URL_}/storage/v1/object/media/${ip}`,{method:"DELETE",headers:{apikey:KEY}}).catch(()=>{})}
       toast("Saved");loadComm().then(()=>{render();load()});openMine()
@@ -446,7 +463,7 @@ async function openMine(){
   openMod('<h2>My listings</h2><div id="mine"><div class="sk"></div></div>');
   try{
     const r=await (await fetch(`${URL_}/rest/v1/places?select=*&user_id=eq.${me.id}&order=created_at.desc`,{headers:{apikey:KEY}})).json();
-    mineRows=Object.fromEntries(r.map(p=>[p.id,p]));$("#mine").innerHTML=r.length?r.map(p=>`<div class="mrow">${p.image_url?`<img class="th" src="${esc(p.image_url)}" alt="">`:""}<div style="flex:1;min-width:0"><b>${esc(p.name)}</b><span>${CATS[p.category]?CATS[p.category].label:esc(p.category)}${p.phone?" · "+esc(p.phone):""}</span></div><button class="btn sm" data-show="${p.lat},${p.lon}" data-cat="${esc(p.category)}" data-n="${esc(p.name)}">Show</button> <button class="btn alt sm" data-edit="${p.id}">Edit</button> <button class="btn alt sm" data-id="${p.id}" data-n="${esc(p.name)}" data-img="${esc(p.image_url||"")}">Delete</button></div>`).join(""):'<div class="empty">You have not added any places yet.</div>';
+    mineRows=Object.fromEntries(r.map(p=>[p.id,p]));$("#mine").innerHTML=r.length?r.map(p=>`<div class="mrow">${p.image_url?`<img class="th" src="${esc(p.image_url)}" alt="">`:""}<div style="flex:1;min-width:0"><b>${esc(p.name)}</b><span>${CATS[p.category]?CATS[p.category].label:esc(p.category)}${p.phone?" · "+esc(p.phone):""}</span></div><button class="btn sm" data-show="${p.lat},${p.lon}" data-cat="${esc(p.category)}" data-n="${esc(p.name)}">Show</button> <button class="btn alt sm" data-edit="${p.id}">Edit</button> ${canDel()?`<button class="btn alt sm" data-id="${p.id}" data-n="${esc(p.name)}" data-img="${esc(p.image_url||"")}">Delete</button>`:""}</div>`).join(""):'<div class="empty">You have not added any places yet.</div>';
     $("#mine").querySelectorAll("button[data-show]").forEach(b=>b.onclick=()=>{
       const [la,lo]=b.dataset.show.split(",").map(Number);
       setCat(b.dataset.cat);loc={lat:la,lon:lo};$("#where").textContent="📍 Showing "+b.dataset.n;closeMod();load()});
