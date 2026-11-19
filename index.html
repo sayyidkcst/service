@@ -72,11 +72,11 @@ input:focus,select:focus{outline:2px solid var(--acc2);border-color:transparent}
 .pick{display:block;margin-top:10px;border:2px dashed var(--line);border-radius:14px;padding:14px;text-align:center;color:var(--mut);cursor:pointer;font-size:14px}
 .pv{display:none;width:100%;max-height:200px;object-fit:cover;border-radius:14px;margin-top:10px}
 .th{width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto;margin-right:10px}
-#mod{position:fixed;inset:0;z-index:50;background:#0009;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:none;align-items:flex-end;justify-content:center}
+#mod{position:fixed;inset:0;z-index:50;background:#0009;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:14px}
 #mod.on{display:flex;animation:fi .18s}@keyframes fi{from{opacity:0}}
-#sheet{position:relative;width:100%;max-width:520px;max-height:90dvh;overflow-y:auto;background:var(--bg);border-radius:26px 26px 0 0;padding:26px 18px calc(22px + env(safe-area-inset-bottom,0px));animation:up .28s cubic-bezier(.2,.9,.3,1)}
-#sheet::before{content:"";position:absolute;top:8px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line)}
-@keyframes up{from{transform:translateY(60px);opacity:0}}
+#sheet{position:relative;width:100%;max-width:520px;max-height:88dvh;overflow-y:auto;background:var(--bg);border-radius:24px;padding:26px 18px 22px;box-shadow:0 20px 60px #0006;animation:up .22s cubic-bezier(.2,.9,.3,1)}
+#sheet::before{display:none}
+@keyframes up{from{transform:scale(.94);opacity:0}}
 #sheet h2{font-size:22px;margin-bottom:4px;letter-spacing:-.01em}
 #sheet input,#sheet select{width:100%;margin-top:10px}
 .sub{color:var(--mut);font-size:14px;margin-bottom:8px}
@@ -179,21 +179,34 @@ function catOf(t){
 const capAll=l=>{const n={};return l.filter(i=>(n[i.cat]=(n[i.cat]||0)+1)<=15)};
 const pretty=s=>s.replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
 
-async function setLoc(lat,lon,label){
-  loc={lat,lon};$("#where").textContent=label||"📍 Your location";if(!sortTouched)$("#sort").value="near";load();
+async function setLoc(lat,lon,label,acc){
+  const ac=acc?(acc>1500?" · approximate, ±"+Math.round(acc/1000)+" km":" · ±"+Math.round(acc)+" m"):"";
+  loc={lat,lon};$("#where").textContent=label||"📍 Your location"+ac;if(!sortTouched)$("#sort").value="near";load();
   if(label)return;
   try{
     const j=await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=16&lat=${lat}&lon=${lon}`)).json(),a=j.address||{};
-    const n=a.suburb||a.village||a.town||a.city||a.county||"";
-    if(n&&loc&&loc.lat===lat)$("#where").textContent="📍 Near "+n+(a.state_district?", "+a.state_district:"")
+    const n=a.suburb||a.neighbourhood||a.village||a.town||a.city||a.county||"";
+    if(n&&loc&&loc.lat===lat)$("#where").textContent="📍 Near "+n+(a.state_district?", "+a.state_district:"")+ac
   }catch(e){}}
 
 function useMe(){
-  if(!navigator.geolocation){$("#where").textContent="Location is not supported. Search an area instead.";return}
-  $("#where").textContent="Finding your location…";
-  navigator.geolocation.getCurrentPosition(p=>setLoc(p.coords.latitude,p.coords.longitude),
-    ()=>{$("#where").textContent="Location is blocked. Search an area below.";render()},
-    {enableHighAccuracy:true,timeout:12000,maximumAge:60000})}
+  const W=$("#where");
+  if(!navigator.geolocation){W.textContent="Location is not supported. Search an area instead.";return}
+  W.textContent="Finding your location…";
+  let best=null,done=false,wid=null,tm=null;
+  const stop=()=>{if(wid!=null)navigator.geolocation.clearWatch(wid);clearTimeout(tm)};
+  const finish=()=>{
+    if(done)return;done=true;stop();
+    if(best)setLoc(best.latitude,best.longitude,undefined,best.accuracy);
+    else{W.textContent="Could not get your location. Turn on GPS or search an area below.";render()}};
+  const blocked=()=>{if(done)return;done=true;stop();W.textContent="Location is blocked. Allow it in browser settings, or search an area below.";render()};
+  wid=navigator.geolocation.watchPosition(p=>{
+    if(done)return;
+    if(!best||p.coords.accuracy<best.accuracy)best=p.coords;
+    if(best.accuracy<=100)finish()},
+    e=>{if(e.code===1)blocked();else if(best)finish()},
+    {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  tm=setTimeout(finish,10000)}
 $("#gpsb").onclick=useMe;
 $("#refb").onclick=async()=>{
   const b=$("#refb"),v=b.firstElementChild;if(b.disabled)return;
