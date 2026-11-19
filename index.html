@@ -49,10 +49,12 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .badge{display:inline-block;font:800 9.5px inherit;text-transform:uppercase;letter-spacing:.05em;color:#fff;background:linear-gradient(135deg,var(--acc),var(--acc2));border-radius:7px;padding:3px 7px}
 .act{display:flex;gap:8px;padding:12px 14px 14px}
 .act a{flex:1;text-align:center;text-decoration:none;font:700 14px inherit;padding:11px 10px;border-radius:13px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
+.act{flex-wrap:wrap}.act a{min-width:90px}.act a.wa{background:#25d366;color:#fff}
 .act a.alt{background:color-mix(in srgb,var(--acc2) 14%,transparent);color:var(--acc)}
 .act a:active{transform:scale(.97)}
 .empty{text-align:center;color:var(--mut);padding:44px 16px;font-size:14px;line-height:1.55}.empty .eg{font-size:44px;margin-bottom:8px}
 .sk{height:120px;border-radius:22px;background:var(--card);border:1px solid var(--line);margin-bottom:14px;animation:p 1.2s infinite alternate}
+@keyframes spin{to{transform:rotate(360deg)}}
 @keyframes p{to{opacity:.45}}
 .note{color:var(--mut);font-size:11px;text-align:center;margin-top:10px}
 .tabs{position:absolute;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:flex-end;background:color-mix(in srgb,var(--card) 88%,transparent);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-top:1px solid var(--line);padding:6px 6px calc(8px + env(safe-area-inset-bottom,0px))}
@@ -101,7 +103,7 @@ input:focus,select:focus{outline:2px solid var(--acc2);border-color:transparent}
     <div class="hrow">
       <div style="min-width:0"><div class="brand">📍 Nearby</div>
         <button class="loc" id="locb"><span id="where">Finding your location…</span><i>▾</i></button></div>
-      <button class="round" id="gpsb" aria-label="Use my location">◎</button>
+      <div style="display:flex;gap:8px;flex:0 0 auto"><button class="round" id="refb" aria-label="Refresh"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="vertical-align:middle"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button><button class="round" id="gpsb" aria-label="Use my location">◎</button></div>
     </div>
     <div class="srch"><svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 0 5 14l5 5 2-2-5-5A8 8 0 0 0 10 2zm0 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>
       <input id="f" type="search" placeholder="Search shops, hospitals, vehicles…" enterkeyhint="search"></div>
@@ -192,6 +194,12 @@ function useMe(){
     ()=>{$("#where").textContent="Location is blocked. Search an area below.";render()},
     {enableHighAccuracy:true,timeout:12000,maximumAge:60000})}
 $("#gpsb").onclick=useMe;
+$("#refb").onclick=async()=>{
+  const b=$("#refb"),v=b.firstElementChild;if(b.disabled)return;
+  b.disabled=true;v.style.animation="spin .8s linear infinite";
+  cache.clear();
+  try{await loadComm();if(loc)await load();else render()}catch(e){}
+  v.style.animation="";b.disabled=false;toast("Refreshed")};
 $("#locb").onclick=()=>openLoc();
 async function goArea(){
   const q=$("#area").value.trim();if(!q)return;
@@ -251,11 +259,12 @@ async function load(){
   if(my!==busy)return;
   osmFail=!osm;items=osm||[];render()}
 
+const waNum=p=>{let d=p.replace(/\D/g,"").replace(/^0+/,"");if(d.length===10)d="91"+d;return d};
 function card(i,k){
   const ph=(i.comm?i.phone:(i.t.phone||i.t["contact:phone"]||"")).split(";")[0].trim();
   const addr=i.comm?(i.address||""):[i.t["addr:housename"],i.t["addr:street"],i.t["addr:suburb"]||i.t["addr:city"]].filter(Boolean).join(", ");
   const own=i.comm&&me&&i.user_id===me.id,c=i.cat||cat,ico=(CATS[c]||CATS.all).ico;
-  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.comm?'<span class="badge">Local listing</span>':""}${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div><div class="act"><a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener">Directions</a>${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}">Call</a>`:""}${own?`<a class="alt" href="#" data-del="${i.id}" data-n="${esc(i.name)}" data-img="${esc(i.image||"")}">Delete</a>`:""}</div></div>`}
+  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div><div class="act"><a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener">Directions</a>${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}">Call</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener">WhatsApp</a>`:""}</div></div>`}
 $("#list").onclick=e=>{
   const z=e.target.closest("[data-zoom]");
   if(z){openMod(`<img src="${esc(z.dataset.zoom)}" alt="" style="width:100%;border-radius:14px;margin-top:20px">`);return}
@@ -353,10 +362,8 @@ function openAdd(){
     const f=e.target.files[0];if(!f)return;
     try{aImg=await toJpeg(f);const v=$("#a-pv");v.src=URL.createObjectURL(aImg);v.style.display="block";$("#a-pk").textContent="📷 Change photo"}
     catch(er){$("#a-err").textContent="Could not read that photo"}};
-  $("#a-gps").onclick=()=>{
-    if(!navigator.geolocation){$("#a-err").textContent="Location is not supported on this device";return}
-    navigator.geolocation.getCurrentPosition(p=>{aLoc={lat:p.coords.latitude,lon:p.coords.longitude};aPlace="";showL();$("#a-err").textContent=""},
-      ()=>{$("#a-err").textContent="Could not get location. Allow location access and try again."},{enableHighAccuracy:true,timeout:12000})};
+  $("#a-gps").onclick=()=>{$("#a-err").textContent="Getting location…";
+    getPos(p=>{aLoc={lat:p.coords.latitude,lon:p.coords.longitude};aPlace="";showL();$("#a-err").textContent=""},m=>$("#a-err").textContent=m)};
   $("#a-save").onclick=async()=>{
     const err=$("#a-err"),name=$("#a-name").value.trim();err.textContent="";
     if(!name){err.textContent="Enter a name";return}
@@ -378,15 +385,73 @@ function openAdd(){
     }catch(e){err.textContent=e.message;b.disabled=false}}}
 $("#add").onclick=openAdd;
 
+let mineRows={};
+function getPos(ok,bad){
+  const msg=e=>e&&e.code===1?"Location permission is blocked. Allow location for this site in your browser settings, then try again.":e&&e.code===2?"Location is unavailable. Turn on your phone's location (GPS) and try again.":"Location timed out. Move to an open area and try again.";
+  if(!navigator.geolocation){bad("Location is not supported on this device");return}
+  navigator.geolocation.getCurrentPosition(ok,e=>{
+    if(e&&e.code===1){bad(msg(e));return}
+    navigator.geolocation.getCurrentPosition(ok,e2=>bad(msg(e2)),{enableHighAccuracy:false,timeout:15000,maximumAge:300000})},
+    {enableHighAccuracy:true,timeout:10000,maximumAge:0})}
+function openEdit(p){
+  openMod(`<h2>Edit place</h2><p class="sub">Update the details of your listing</p>
+    <select id="e-cat">${Object.entries(CATS).filter(([k])=>k!=="all").map(([k,c])=>`<option value="${k}">${c.ico} ${c.label}</option>`).join("")}</select>
+    <input id="e-name" placeholder="Name" maxlength="120">
+    <input id="e-phone" type="tel" placeholder="Phone number" maxlength="30">
+    <input id="e-detail" placeholder="Details" maxlength="200">
+    <input id="e-addr" placeholder="Address or landmark" maxlength="300">
+    <label class="pick" for="e-img" id="e-pk">📷 Change photo</label><input id="e-img" type="file" accept="image/*" hidden><img class="pv" id="e-pv" alt="">
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="e-find" placeholder="Search new location, e.g. Areekode police station" style="margin-top:0;flex:1"><button class="btn sm" id="e-fb">Find</button></div>
+    <div class="locrow"><span id="e-loc"></span><button class="btn alt sm" id="e-gps">Use my GPS</button></div>
+    <div class="err" id="e-err"></div>
+    <div class="two"><button class="btn alt" id="e-cancel">Cancel</button><button class="btn" id="e-save">Save</button></div>`);
+  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";$("#e-detail").value=p.detail||"";$("#e-addr").value=p.address||"";
+  let eLoc={lat:p.lat,lon:p.lon},ePlace="",eImg=null;
+  if(p.image_url){const v=$("#e-pv");v.src=p.image_url;v.style.display="block"}else $("#e-pk").textContent="📷 Add a photo (optional)";
+  $("#e-img").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    try{eImg=await toJpeg(f);const v=$("#e-pv");v.src=URL.createObjectURL(eImg);v.style.display="block";$("#e-pk").textContent="📷 Change photo"}
+    catch(er){$("#e-err").textContent="Could not read that photo"}};
+  const showE=()=>$("#e-loc").innerHTML=`📍 <a href="https://www.google.com/maps?q=${eLoc.lat},${eLoc.lon}" target="_blank" rel="noopener" style="color:var(--acc)">${ePlace?esc(ePlace):eLoc.lat.toFixed(5)+", "+eLoc.lon.toFixed(5)}</a>`;
+  showE();
+  const eFind=async()=>{
+    const q=$("#e-find").value.trim();if(!q)return;$("#e-err").textContent="";
+    try{
+      const r=await (await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q))).json();
+      if(!r.length){$("#e-err").textContent="Location not found. Try a nearby landmark, or stand at the place and tap Use my GPS.";return}
+      eLoc={lat:+r[0].lat,lon:+r[0].lon};ePlace=r[0].display_name.split(",").slice(0,3).join(",");showE()
+    }catch(e){$("#e-err").textContent="Could not search. Check your internet."}};
+  $("#e-fb").onclick=eFind;$("#e-find").onkeydown=e=>{if(e.key==="Enter")eFind()};
+  $("#e-gps").onclick=()=>{$("#e-err").textContent="Getting location…";
+    getPos(g=>{eLoc={lat:g.coords.latitude,lon:g.coords.longitude};ePlace="";showE();$("#e-err").textContent=""},m=>$("#e-err").textContent=m)};
+  $("#e-cancel").onclick=openMine;
+  $("#e-save").onclick=async()=>{
+    const err=$("#e-err"),name=$("#e-name").value.trim();err.textContent="";
+    if(!name){err.textContent="Enter a name";return}
+    const b=$("#e-save");b.disabled=true;
+    try{
+      let imgUrl=p.image_url||null;
+      if(eImg){
+        b.textContent="Uploading photo…";
+        const path=`places/${me.id}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+        const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:eImg});
+        if(!up.ok){err.textContent="Photo upload failed. Try again or save without changing the photo.";b.disabled=false;b.textContent="Save";return}
+        imgUrl=`${URL_}/storage/v1/object/public/media/${path}`}
+      const r=await rpc("update_place",{p_mobile:me.mobile,p_hash:me.hash,p_id:p.id,p_category:$("#e-cat").value,p_name:name,p_phone:$("#e-phone").value.trim(),p_detail:$("#e-detail").value.trim(),p_address:$("#e-addr").value.trim(),p_lat:eLoc.lat,p_lon:eLoc.lon,p_image:imgUrl});
+      if(r&&r.error){err.textContent=r.error;b.disabled=false;b.textContent="Save";return}
+      if(eImg&&p.image_url){const ip=p.image_url.split("/object/public/media/")[1];if(ip)fetch(`${URL_}/storage/v1/object/media/${ip}`,{method:"DELETE",headers:{apikey:KEY}}).catch(()=>{})}
+      toast("Saved");loadComm().then(()=>{render();load()});openMine()
+    }catch(e){err.textContent=e.message;b.disabled=false}}}
 async function openMine(){
   openMod('<h2>My listings</h2><div id="mine"><div class="sk"></div></div>');
   try{
     const r=await (await fetch(`${URL_}/rest/v1/places?select=*&user_id=eq.${me.id}&order=created_at.desc`,{headers:{apikey:KEY}})).json();
-    $("#mine").innerHTML=r.length?r.map(p=>`<div class="mrow">${p.image_url?`<img class="th" src="${esc(p.image_url)}" alt="">`:""}<div style="flex:1;min-width:0"><b>${esc(p.name)}</b><span>${CATS[p.category]?CATS[p.category].label:esc(p.category)}${p.phone?" · "+esc(p.phone):""}</span></div><button class="btn sm" data-show="${p.lat},${p.lon}" data-cat="${esc(p.category)}" data-n="${esc(p.name)}">Show</button> <button class="btn alt sm" data-id="${p.id}" data-n="${esc(p.name)}" data-img="${esc(p.image_url||"")}">Delete</button></div>`).join(""):'<div class="empty">You have not added any places yet.</div>';
+    mineRows=Object.fromEntries(r.map(p=>[p.id,p]));$("#mine").innerHTML=r.length?r.map(p=>`<div class="mrow">${p.image_url?`<img class="th" src="${esc(p.image_url)}" alt="">`:""}<div style="flex:1;min-width:0"><b>${esc(p.name)}</b><span>${CATS[p.category]?CATS[p.category].label:esc(p.category)}${p.phone?" · "+esc(p.phone):""}</span></div><button class="btn sm" data-show="${p.lat},${p.lon}" data-cat="${esc(p.category)}" data-n="${esc(p.name)}">Show</button> <button class="btn alt sm" data-edit="${p.id}">Edit</button> <button class="btn alt sm" data-id="${p.id}" data-n="${esc(p.name)}" data-img="${esc(p.image_url||"")}">Delete</button></div>`).join(""):'<div class="empty">You have not added any places yet.</div>';
     $("#mine").querySelectorAll("button[data-show]").forEach(b=>b.onclick=()=>{
       const [la,lo]=b.dataset.show.split(",").map(Number);
       setCat(b.dataset.cat);loc={lat:la,lon:lo};$("#where").textContent="📍 Showing "+b.dataset.n;closeMod();load()});
-    $("#mine").querySelectorAll("button[data-id]").forEach(b=>b.onclick=()=>confirmDel(+b.dataset.id,b.dataset.n,openMine,b.dataset.img))
+    $("#mine").querySelectorAll("button[data-id]").forEach(b=>b.onclick=()=>confirmDel(+b.dataset.id,b.dataset.n,openMine,b.dataset.img));
+    $("#mine").querySelectorAll("button[data-edit]").forEach(b=>b.onclick=()=>openEdit(mineRows[b.dataset.edit]))
   }catch(e){$("#mine").innerHTML='<div class="empty">Could not load. Check your internet.</div>'}}
 function confirmDel(id,name,after,img){
   openMod(`<div class="cic">🗑️</div><h2 style="text-align:center">Delete place?</h2><p class="sub" style="text-align:center">${esc(name)} will be removed for everyone.</p><div class="two"><button class="btn alt" id="dn">Cancel</button><button class="btn red" id="dy">Delete</button></div>`);
