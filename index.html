@@ -150,6 +150,7 @@ const esc=t=>String(t==null?"":t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;"
 const CATS={
   all:{label:"All",ico:"🔎",q:[]},
   hospital:{label:"Hospitals",ico:"🏥",q:['nwr["amenity"~"^(hospital|clinic|doctors)$"]']},
+  ambulance:{label:"Ambulance",ico:"🚑",q:['nwr["emergency"="ambulance_station"]','nwr["amenity"="ambulance_station"]']},
   pharmacy:{label:"Pharmacies",ico:"💊",q:['nwr["amenity"="pharmacy"]']},
   police:{label:"Police",ico:"🚓",q:['nwr["amenity"="police"]']},
   fire:{label:"Fire stations",ico:"🚒",q:['nwr["amenity"="fire_station"]']},
@@ -182,8 +183,8 @@ applyTheme();
 let loc=null,cat="all",items=[],comm=[],osmFail=false,busy=0;
 const cache=new Map();
 
-const COL={all:"#0f766e",hospital:"#ef4444",pharmacy:"#10b981",police:"#3b82f6",fire:"#f97316",shop:"#8b5cf6",transport:"#eab308",bus:"#06b6d4",fuel:"#64748b",bank:"#0ea5e9",food:"#ec4899",other:"#78716c"};
-const SHORT={all:"All",hospital:"Hospital",pharmacy:"Pharmacy",police:"Police",fire:"Fire",shop:"Shops",transport:"Vehicles",bus:"Bus time",fuel:"Fuel",bank:"Banks",food:"Food",other:"Other"};
+const COL={all:"#0f766e",hospital:"#ef4444",ambulance:"#f43f5e",pharmacy:"#10b981",police:"#3b82f6",fire:"#f97316",shop:"#8b5cf6",transport:"#eab308",bus:"#06b6d4",fuel:"#64748b",bank:"#0ea5e9",food:"#ec4899",other:"#78716c"};
+const SHORT={all:"All",hospital:"Hospital",ambulance:"Ambulance",pharmacy:"Pharmacy",police:"Police",fire:"Fire",shop:"Shops",transport:"Vehicles",bus:"Bus time",fuel:"Fuel",bank:"Banks",food:"Food",other:"Other"};
 $("#chips").innerHTML=Object.entries(CATS).map(([k,c])=>`<button class="chip${k===cat?" on":""}" data-c="${k}" style="--c:${COL[k]}"><span class="ci">${c.ico}</span>${SHORT[k]}</button>`).join("");
 $("#chips").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;setCat(b.dataset.c);$("#f").value="";render();load()};
 let sortTouched=false;
@@ -196,6 +197,7 @@ const km=(a,b,c,d)=>{const p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,h=Math.sin(x/2)**2+
 const fmtD=k=>k<1?Math.max(10,Math.round(k*100)*10)+" m":k.toFixed(1)+" km";
 function catOf(t){
   const a=t.amenity||"";
+  if(a==="ambulance_station"||t.emergency==="ambulance_station")return"ambulance";
   if(/^(hospital|clinic|doctors)$/.test(a))return"hospital";
   if(a==="pharmacy")return"pharmacy";if(a==="police")return"police";if(a==="fire_station")return"fire";
   if(a==="fuel")return"fuel";if(/^(bank|atm)$/.test(a))return"bank";if(/^(restaurant|cafe|fast_food)$/.test(a))return"food";
@@ -307,7 +309,7 @@ function addBusRow(x,r){
 function setBusRows(x,rows){
   $("#"+x+"-rows").innerHTML="";(rows&&rows.length?rows:[{}]).forEach(r=>addBusRow(x,r))}
 const hoursHTML=x=>`<div id="${x}-hrs" style="display:none"><div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:var(--mut)">Opening time<input id="${x}-open" type="time"></label><label style="flex:1;font-size:12px;color:var(--mut)">Closing time<input id="${x}-close" type="time"></label></div><select id="${x}-off"><option value="">Weekly off: none</option>${WD.map(d=>`<option value="${d}">Weekly off: ${d}</option>`).join("")}</select></div><div id="${x}-bus" style="display:none"><div class="bt-h"><span>Place</span><span>Time</span><span></span></div><div id="${x}-rows"></div><button type="button" class="btn alt sm" id="${x}-addrow" style="margin-top:10px">+ Add row</button></div>`;
-const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),b=$("#"+x+"-bus"),t=()=>{h.style.display=c.value==="shop"?"block":"none";b.style.display=c.value==="bus"?"block":"none";["name","phone","addr"].forEach(k=>{const el=$("#"+x+"-"+k);if(el)el.style.display=c.value==="bus"?"none":""});const d=$("#"+x+"-detail");if(d){if(!d.dataset.ph)d.dataset.ph=d.placeholder;d.placeholder=c.value==="bus"?"Bus name (e.g. KSRTC Fast Passenger)":d.dataset.ph}};c.onchange=t;t();
+const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),b=$("#"+x+"-bus"),t=()=>{h.style.display=c.value==="shop"?"block":"none";b.style.display=c.value==="bus"?"block":"none";["name","phone","addr"].forEach(k=>{const el=$("#"+x+"-"+k);if(el)el.style.display=c.value==="bus"?"none":""});[$("#"+x+"-find"),$("#"+x+"-loc")].forEach(el=>{if(el&&el.parentElement)el.parentElement.style.display=c.value==="ambulance"?"none":""});const d=$("#"+x+"-detail");if(d){if(!d.dataset.ph)d.dataset.ph=d.placeholder;d.placeholder=c.value==="bus"?"Bus name (e.g. KSRTC Fast Passenger)":d.dataset.ph}};c.onchange=t;t();
   const box=$("#"+x+"-rows");
   if(!box.children.length)setBusRows(x);
   $("#"+x+"-addrow").onclick=()=>addBusRow(x);
@@ -534,10 +536,10 @@ function openAdd(){
   $("#a-gps").onclick=()=>{$("#a-err").textContent="Getting location…";
     getPos(p=>{aLoc={lat:p.coords.latitude,lon:p.coords.longitude};aPlace="";showL();$("#a-err").textContent=""},m=>$("#a-err").textContent=m)};
   $("#a-save").onclick=async()=>{
-    const err=$("#a-err"),isBus=$("#a-cat").value==="bus";let name=$("#a-name").value.trim();err.textContent="";
+    const err=$("#a-err"),isBus=$("#a-cat").value==="bus",isAmb=$("#a-cat").value==="ambulance";let name=$("#a-name").value.trim();err.textContent="";
     if(isBus){name=busTitle("a");if(!name){err.textContent="Enter the bus name and add at least one place and time";return}}
     else if(!name){err.textContent="Enter a name";return}
-    if(!aLoc){err.textContent="Tap Use my current location first";return}
+    if(!aLoc){err.textContent=isAmb?"First tap ◎ on the main screen to set your area, then add again":"Tap Use my current location first";return}
     const b=$("#a-save");b.disabled=true;
     try{
       const c=$("#a-cat").value;
