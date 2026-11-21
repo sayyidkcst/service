@@ -370,12 +370,34 @@ async function loadComm(){
     if(!res.ok)return;
     comm=(await res.json()).map(p=>({comm:1,id:p.id,user_id:p.user_id,owner:p.owner_name,lat:p.lat,lon:p.lon,name:p.name,type:p.category==="bus"?"Bus time":parseMeta(p.detail).text||(CATS[p.category]?CATS[p.category].label:"Place"),phone:p.phone,address:p.address,image:p.image_url,cat:p.category,created:p.created_at,t:(m=>({opening_hours:m.hrs,bus:m.rows.length?"":m.bt,rows:m.rows}))(parseMeta(p.detail)),d:null}))
   }catch(e){}}
+const OSM_KEYS=["phone","contact:phone","opening_hours","addr:housename","addr:street","addr:suburb","addr:city"];
+async function fetchDbOsm(r){
+  try{
+    const dLat=r/111000,dLon=r/(111000*Math.max(.2,Math.cos(loc.lat*Math.PI/180)));
+    const since=new Date(Date.now()-60*864e5).toISOString();
+    let u=`${URL_}/rest/v1/osm_places?select=place_key,name,type,category,lat,lon,tags,updated_at&lat=gte.${loc.lat-dLat}&lat=lte.${loc.lat+dLat}&lon=gte.${loc.lon-dLon}&lon=lte.${loc.lon+dLon}&updated_at=gte.${encodeURIComponent(since)}&limit=1500`;
+    if(cat!=="all")u+=`&category=eq.${cat}`;
+    const res=await fetch(u,{headers:{apikey:KEY}});if(!res.ok)return[];
+    return (await res.json()).map(x=>({lat:x.lat,lon:x.lon,t:x.tags||{},name:x.name||"",type:x.type||"Place",cat:x.category,d:km(loc.lat,loc.lon,x.lat,x.lon),_k:x.place_key,_u:x.updated_at})).filter(i=>i.d<=r/1000).sort((a,b)=>a.d-b.d)
+  }catch(e){return[]}}
+function saveOsm(list,dbl){
+  const known={};dbl.forEach(i=>known[i._k]=i._u);
+  const rows=list.map(i=>({k:pkey(i),n:i.name,ty:i.type,c:i.cat,la:+i.lat,lo:+i.lon,tg:Object.fromEntries(OSM_KEYS.filter(k=>i.t[k]).map(k=>[k,String(i.t[k]).slice(0,120)]))}))
+    .filter(r=>{const u=known[r.k];return !u||Date.now()-new Date(u)>7*864e5}).slice(0,500);
+  if(rows.length)rpc("save_osm_places",{p_items:rows}).catch(()=>{})}
 async function load(){
   if(!loc){render();return}
   const rad=+$("#rad").value,r=(rad>0?rad:5)*1000,key=[cat,loc.lat.toFixed(3),loc.lon.toFixed(3),r].join("|"),my=++busy;
   status("Searching nearby places…");
   let osm=cache.get(key);
-  if(!osm){osm=await fetchOSM(r);if(osm)cache.set(key,osm)}
+  if(!osm){
+    const dbl=await fetchDbOsm(r);
+    if(my!==busy)return;
+    if(dbl.length){osmFail=false;items=cat==="all"?capAll(dbl):dbl;render()}
+    osm=await fetchOSM(r);
+    if(osm){cache.set(key,osm);saveOsm(osm,dbl)}
+    else if(dbl.length)osm=cat==="all"?capAll(dbl):dbl
+  }
   if(my!==busy)return;
   osmFail=!osm;items=osm||[];render()}
 
@@ -452,7 +474,7 @@ function openAuth(next){
       me={id:r.id,name:r.name,mobile:mob,hash:h};saveMe();paintAcct();loadProfile();closeMod();toast("Welcome, "+me.name.split(" ")[0]);
       if(next)next();else render()
     }catch(e){err.textContent=e.message;b.disabled=false}}}
-const aboutHTML=()=>`<div class="about"><div class="lg">🏢</div><div><b>KCST Media Technology</b><span>Vadakummuri</span><span>Urangatiry (po)</span><span>673639</span></div></div>`;
+const aboutHTML=()=>`<div class="about"><div class="lg">🏢</div><div><b>KCST Media Technology</b><span>Vadakummuri</span><span>Urangatiry (po)</span><span>673639</span></div></div><p class="note" style="margin-top:8px">Map data © OpenStreetMap contributors</p>`;
 const avHTML=z=>me&&me.avatar?`<img src="${esc(me.avatar)}" alt="" style="width:${z}px;height:${z}px;border-radius:50%;object-fit:cover;flex:0 0 auto">`:`<div style="width:${z}px;height:${z}px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;display:grid;place-items:center;font:700 ${Math.round(z*.42)}px inherit;flex:0 0 auto">${esc((me&&me.name||"?").trim().charAt(0).toUpperCase())}</div>`;
 async function loadProfile(){
   if(!me)return;
