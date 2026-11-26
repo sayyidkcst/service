@@ -33,6 +33,7 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .chip .ci{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;font-size:26px;background:var(--card);border:1px solid var(--line);transition:all .2s}
 .chip.on{color:var(--fg)}.chip.on .ci{background:var(--c);border-color:transparent;transform:translateY(-2px);box-shadow:0 8px 18px color-mix(in srgb,var(--c) 45%,transparent)}
 .filters{display:flex;gap:8px;margin:2px 0 6px}
+.filters input{flex:1;min-width:0;font:600 13px inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:20px;padding:10px 14px}
 .filters select{flex:1;min-width:0;font:600 13px inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:20px;padding:10px 14px}
 #status{color:var(--mut);font-size:12.5px;margin:8px 4px 12px;min-height:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:22px;margin-bottom:14px;overflow:hidden;box-shadow:0 4px 16px #0f1d240d;animation:in .4s both;animation-delay:calc(var(--i,0)*45ms)}
@@ -108,6 +109,31 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--acc2);border-col
 .sosg a{text-decoration:none;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 10px;text-align:center;font-size:13px;color:var(--mut)}
 .sosg a b{display:block;font-size:30px;color:var(--red);letter-spacing:-.02em}.sosg a.s1{grid-column:1/-1;background:#dc262614;border-color:#dc262644}
 #toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14px);transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:22px;font-size:13px;font-weight:600;z-index:90;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
+
+/* ---------- Desktop view (wide screens) ---------- */
+@media (min-width:900px){
+  #app{max-width:none;display:grid;grid-template-columns:230px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);box-shadow:none}
+  .hd{grid-column:1/-1;display:flex;align-items:center;gap:32px;padding:14px 32px;border-radius:0;box-shadow:0 4px 18px #0f766e33}
+  .hrow{flex:0 0 auto;gap:22px}
+  .loc{font-size:17px}.loc span{max-width:340px}
+  .srch{margin-top:0;flex:1;max-width:680px}
+  .tabs{position:static;grid-column:1;grid-row:2;flex-direction:column;align-items:stretch;gap:4px;padding:18px 14px;background:var(--card);-webkit-backdrop-filter:none;backdrop-filter:none;border-top:0;border-right:1px solid var(--line);overflow-y:auto}
+  .tab{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:14px;font:600 15px inherit;padding:12px 14px;border-radius:12px}
+  .tab:hover{background:var(--bg)}.tab.on{background:color-mix(in srgb,var(--acc2) 14%,transparent)}
+  .tab span{overflow:visible}
+  .tab.plus{flex:0 0 auto;padding:0;margin:8px 0}
+  .tab.plus b{display:block;width:100%;height:auto;margin:0;padding:13px 14px;border-radius:12px;border:0;font-size:15px;font-weight:700;box-shadow:none;text-align:center}
+  .tab.plus b::after{content:" Add place"}
+  main{grid-column:2;grid-row:2;padding:26px 36px 48px}
+  .chips{flex-wrap:wrap;overflow:visible;margin:0 0 8px;padding:4px 0 14px}
+  .filters{max-width:560px}
+  #status{margin-left:0}
+  #list{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:18px;align-items:start}
+  #list .card{margin-bottom:0}
+  #list .empty{grid-column:1/-1}
+  .card{transition:box-shadow .2s,transform .2s}.card:hover{box-shadow:0 10px 28px #0f1d2422;transform:translateY(-2px)}
+  #sheet{max-width:600px}
+}
 </style>
 </head>
 <body>
@@ -128,6 +154,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--acc2);border-col
     <div class="filters">
       <select id="sort" aria-label="Sort"><option value="newest">Sort: Newest</option><option value="near">Sort: Nearest</option><option value="name">Sort: A to Z</option><option value="cat">Sort: Category</option></select>
       <select id="rad" aria-label="Distance"><option value="0" selected>Any distance</option><option value="1">Within 1 km</option><option value="3">Within 3 km</option><option value="5">Within 5 km</option><option value="10">Within 10 km</option></select>
+    </div>
+    <div class="filters" id="bloodf" style="display:none">
+      <input id="bd" list="dist-list2" placeholder="All districts (tap or type)" autocomplete="off" aria-label="District"><datalist id="dist-list2"></datalist>
+      <select id="bg" aria-label="Blood group"><option value="">All blood groups</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select>
     </div>
     <div id="status"></div>
     <div id="list"></div>
@@ -151,6 +181,7 @@ const CATS={
   all:{label:"All",ico:"🔎",q:[]},
   hospital:{label:"Hospitals",ico:"🏥",q:['nwr["amenity"~"^(hospital|clinic|doctors)$"]']},
   ambulance:{label:"Ambulance",ico:"🚑",q:['nwr["emergency"="ambulance_station"]','nwr["amenity"="ambulance_station"]']},
+  blood:{label:"Blood donation",ico:"🩸",q:['nwr["amenity"="blood_donation"]'],named:1},
   pharmacy:{label:"Pharmacies",ico:"💊",q:['nwr["amenity"="pharmacy"]']},
   police:{label:"Police",ico:"🚓",q:['nwr["amenity"="police"]']},
   fire:{label:"Fire stations",ico:"🚒",q:['nwr["amenity"="fire_station"]']},
@@ -183,20 +214,21 @@ applyTheme();
 let loc=null,cat="all",items=[],comm=[],osmFail=false,busy=0;
 const cache=new Map();
 
-const COL={all:"#0f766e",hospital:"#ef4444",ambulance:"#f43f5e",pharmacy:"#10b981",police:"#3b82f6",fire:"#f97316",shop:"#8b5cf6",transport:"#eab308",bus:"#06b6d4",fuel:"#64748b",bank:"#0ea5e9",food:"#ec4899",other:"#78716c"};
-const SHORT={all:"All",hospital:"Hospital",ambulance:"Ambulance",pharmacy:"Pharmacy",police:"Police",fire:"Fire",shop:"Shops",transport:"Vehicles",bus:"Bus time",fuel:"Fuel",bank:"Banks",food:"Food",other:"Other"};
+const COL={all:"#0f766e",hospital:"#ef4444",ambulance:"#f43f5e",blood:"#be123c",pharmacy:"#10b981",police:"#3b82f6",fire:"#f97316",shop:"#8b5cf6",transport:"#eab308",bus:"#06b6d4",fuel:"#64748b",bank:"#0ea5e9",food:"#ec4899",other:"#78716c"};
+const SHORT={all:"All",hospital:"Hospital",ambulance:"Ambulance",blood:"Blood donation",pharmacy:"Pharmacy",police:"Police",fire:"Fire",shop:"Shops",transport:"Vehicles",bus:"Bus time",fuel:"Fuel",bank:"Banks",food:"Food",other:"Other"};
 $("#chips").innerHTML=Object.entries(CATS).map(([k,c])=>`<button class="chip${k===cat?" on":""}" data-c="${k}" style="--c:${COL[k]}"><span class="ci">${c.ico}</span>${SHORT[k]}</button>`).join("");
 $("#chips").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;setCat(b.dataset.c);$("#f").value="";render();load()};
 let sortTouched=false;
 $("#rad").onchange=()=>{render();load()};
 $("#sort").onchange=()=>{sortTouched=true;render()};
-$("#f").oninput=render;
+$("#f").oninput=render;$("#bd").oninput=render;$("#bg").onchange=render;
 
 const status=t=>$("#status").textContent=t;
 const km=(a,b,c,d)=>{const p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,h=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return 12742*Math.asin(Math.sqrt(h))};
 const fmtD=k=>k<1?Math.max(10,Math.round(k*100)*10)+" m":k.toFixed(1)+" km";
 function catOf(t){
   const a=t.amenity||"";
+  if(a==="blood_donation")return"blood";
   if(a==="ambulance_station"||t.emergency==="ambulance_station")return"ambulance";
   if(/^(hospital|clinic|doctors)$/.test(a))return"hospital";
   if(a==="pharmacy")return"pharmacy";if(a==="police")return"police";if(a==="fire_station")return"fire";
@@ -267,7 +299,7 @@ $("#t-sos").onclick=openSOS;
 $("#t-my").onclick=()=>me?openMine():openAuth(openMine);
 $("#t-ex").onclick=()=>$("#main").scrollTo({top:0,behavior:"smooth"});
 
-function setCat(k){cat=k;document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x.dataset.c===k))}
+function setCat(k){cat=k;$("#bloodf").style.display=k==="blood"?"flex":"none";document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x.dataset.c===k))}
 async function fetchOSM(r){
   if(cat!=="all"&&!CATS[cat].q.length)return [];
   const all=cat==="all",qs=all?Object.entries(CATS).filter(([k])=>k!=="all").flatMap(([,c])=>c.q):CATS[cat].q;
@@ -287,16 +319,19 @@ async function fetchOSM(r){
       return all?capAll(list):list
     }catch(e){}}
   return null}
+const NOLOC=new Set(["bus","blood"]);
+const DISTRICTS=["Alappuzha","Ernakulam","Idukki","Kannur","Kasaragod","Kollam","Kottayam","Kozhikode","Malappuram","Palakkad","Pathanamthitta","Thiruvananthapuram","Thrissur","Wayanad"];
+$("#dist-list2").innerHTML=DISTRICTS.map(d=>`<option value="${d}">`).join("");
 const WD=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const t12=t=>{if(!t)return"";const[h,m]=t.split(":").map(Number);return((h%12)||12)+":"+String(m).padStart(2,"0")+" "+(h<12?"AM":"PM")};
 function parseMeta(d){
   d=String(d||"");const k=d.indexOf("||");
-  if(k<0)return{text:d,o:"",c:"",w:"",bt:"",rows:[],hrs:""};
-  const[o="",c="",w="",bt=""]=d.slice(k+2).split("|");
+  if(k<0)return{text:d,o:"",c:"",w:"",bt:"",bl:"",rows:[],hrs:""};
+  const[o="",c="",w="",bt="",bl=""]=d.slice(k+2).split("|");
   const parts=[];if(o&&c)parts.push(t12(o)+" – "+t12(c));else if(o)parts.push("Opens "+t12(o));else if(c)parts.push("Closes "+t12(c));
   if(w)parts.push("Closed on "+w);
-  return{text:d.slice(0,k),o,c,w,bt,rows:bt.includes("^")?bt.split("~").map(r=>{const a=r.split("^");return a.length>=3?{n:a[0],p:a[1],t:a[2]}:{n:"",p:a[0]||"",t:a[1]||""}}):[],hrs:parts.join(" · ")}}
-const encMeta=(text,m)=>m&&(m[0]||m[1]||m[2])?text+"||"+m.join("|"):text;
+  return{text:d.slice(0,k),o,c,w,bt,bl,rows:bt.includes("^")?bt.split("~").map(r=>{const a=r.split("^");return a.length>=3?{n:a[0],p:a[1],t:a[2]}:{n:"",p:a[0]||"",t:a[1]||""}}):[],hrs:parts.join(" · ")}}
+const encMeta=(text,m)=>m&&m.some(Boolean)?text+"||"+m.join("|"):text;
 const ttHTML=(r,name)=>{
   const rs=[...r].sort((a,b)=>(a.t||"99").localeCompare(b.t||"99")),merged=rs.length>0&&rs.every(x=>!x.n);
   const tb=`<table class="tt"><thead><tr><th>Bus name</th><th>Place</th><th>Time</th></tr></thead><tbody>${rs.map((x,k)=>`<tr>${merged?(k===0?`<td rowspan="${rs.length}" style="vertical-align:middle;font-weight:700">${esc(name)}</td>`:""):`<td>${esc(x.n||name)}</td>`}<td>${esc(x.p)}</td><td>${esc(/^\d{1,2}:\d{2}$/.test(x.t)?t12(x.t):x.t)}</td></tr>`).join("")}</tbody></table>`;
@@ -308,13 +343,14 @@ function addBusRow(x,r){
   const row=box.lastElementChild;row.querySelector(".bp").value=r.p||"";row.querySelector(".bm").value=r.t||""}
 function setBusRows(x,rows){
   $("#"+x+"-rows").innerHTML="";(rows&&rows.length?rows:[{}]).forEach(r=>addBusRow(x,r))}
-const hoursHTML=x=>`<div id="${x}-hrs" style="display:none"><div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:var(--mut)">Opening time<input id="${x}-open" type="time"></label><label style="flex:1;font-size:12px;color:var(--mut)">Closing time<input id="${x}-close" type="time"></label></div><select id="${x}-off"><option value="">Weekly off: none</option>${WD.map(d=>`<option value="${d}">Weekly off: ${d}</option>`).join("")}</select></div><div id="${x}-bus" style="display:none"><div class="bt-h"><span>Place</span><span>Time</span><span></span></div><div id="${x}-rows"></div><button type="button" class="btn alt sm" id="${x}-addrow" style="margin-top:10px">+ Add row</button></div>`;
-const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),b=$("#"+x+"-bus"),t=()=>{h.style.display=c.value==="shop"?"block":"none";b.style.display=c.value==="bus"?"block":"none";["name","phone","addr"].forEach(k=>{const el=$("#"+x+"-"+k);if(el)el.style.display=c.value==="bus"?"none":""});const d=$("#"+x+"-detail");if(d){if(!d.dataset.ph)d.dataset.ph=d.placeholder;d.placeholder=c.value==="bus"?"Bus name (e.g. KSRTC Fast Passenger)":d.dataset.ph}};c.onchange=t;t();
+const hoursHTML=x=>`<div id="${x}-hrs" style="display:none"><div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:var(--mut)">Opening time<input id="${x}-open" type="time"></label><label style="flex:1;font-size:12px;color:var(--mut)">Closing time<input id="${x}-close" type="time"></label></div><select id="${x}-off"><option value="">Weekly off: none</option>${WD.map(d=>`<option value="${d}">Weekly off: ${d}</option>`).join("")}</select></div><div id="${x}-bus" style="display:none"><div class="bt-h"><span>Place</span><span>Time</span><span></span></div><div id="${x}-rows"></div><button type="button" class="btn alt sm" id="${x}-addrow" style="margin-top:10px">+ Add row</button></div><div id="${x}-blood" style="display:none"><input id="${x}-dist" list="dist-list" placeholder="District (tap or type to search)" maxlength="60" autocomplete="off" style="width:100%;margin-top:10px"><datalist id="dist-list">${DISTRICTS.map(d=>`<option value="${d}">`).join("")}</datalist><select id="${x}-grp" style="width:100%;margin-top:10px"><option value="">Blood group</option>${["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(g=>`<option value="${g}">${g}</option>`).join("")}</select></div>`;
+const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),b=$("#"+x+"-bus"),t=()=>{h.style.display=c.value==="shop"?"block":"none";b.style.display=c.value==="bus"?"block":"none";[$("#"+x+"-find"),$("#"+x+"-loc")].forEach(el=>{if(el&&el.parentElement)el.parentElement.style.display=NOLOC.has(c.value)?"none":""});const hide=({bus:["name","phone","addr"],blood:["addr","detail"]})[c.value]||[];["name","phone","addr","detail"].forEach(k=>{const el=$("#"+x+"-"+k);if(el)el.style.display=hide.includes(k)?"none":""});$("#"+x+"-blood").style.display=c.value==="blood"?"block":"none";const setPh=(k,v)=>{const el=$("#"+x+"-"+k);if(el){if(!el.dataset.ph)el.dataset.ph=el.placeholder;el.placeholder=v||el.dataset.ph}};setPh("detail",c.value==="bus"?"Bus name (e.g. KSRTC Fast Passenger)":"");setPh("name",c.value==="blood"?"Donor name":"");setPh("phone",c.value==="blood"?"Contact number":"")};c.onchange=t;t();
   const box=$("#"+x+"-rows");
   if(!box.children.length)setBusRows(x);
   $("#"+x+"-addrow").onclick=()=>addBusRow(x);
   box.onclick=e=>{const b=e.target.closest(".bx");if(!b)return;if(box.children.length>1)b.parentNode.remove();else{b.parentNode.querySelectorAll("input").forEach(i=>i.value="")}}};
-const hoursVal=x=>{const c=$("#"+x+"-cat").value;return c==="shop"?[$("#"+x+"-open").value,$("#"+x+"-close").value,$("#"+x+"-off").value,""]:c==="bus"?["","","",[...document.querySelectorAll("#"+x+"-rows .bt-r")].map(r=>[".bp",".bm"].map(q=>r.querySelector(q).value.replace(/[|~^\r\n]+/g," ").trim())).filter(a=>a.some(Boolean)).map(a=>a.join("^")).join("~")]:["","","",""]};
+const bloodVal=x=>{const [d,g]=[$("#"+x+"-dist").value,$("#"+x+"-grp").value].map(v=>v.replace(/[|~^\r\n]+/g," ").trim());return [DISTRICTS.find(k=>k.toLowerCase()===d.toLowerCase())||d,g]};
+const hoursVal=x=>{const c=$("#"+x+"-cat").value;return c==="shop"?[$("#"+x+"-open").value,$("#"+x+"-close").value,$("#"+x+"-off").value,"",""]:c==="blood"?["","","","",bloodVal(x).join("^")]:c==="bus"?["","","",[...document.querySelectorAll("#"+x+"-rows .bt-r")].map(r=>[".bp",".bm"].map(q=>r.querySelector(q).value.replace(/[|~^\r\n]+/g," ").trim())).filter(a=>a.some(Boolean)).map(a=>a.join("^")).join("~"),""]:["","","","",""]};
 const IC={
   dir:'<svg viewBox="0 0 24 24"><path d="M21.71 11.29l-9-9a1 1 0 0 0-1.41 0l-9 9a1 1 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a1 1 0 0 0 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/></svg>',
   call:'<svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg>',
@@ -368,7 +404,7 @@ async function loadComm(){
   try{
     const res=await fetch(`${URL_}/rest/v1/places?select=*&order=created_at.desc&limit=1000`,{headers:{apikey:KEY}});
     if(!res.ok)return;
-    comm=(await res.json()).map(p=>({comm:1,id:p.id,user_id:p.user_id,owner:p.owner_name,lat:p.lat,lon:p.lon,name:p.name,type:p.category==="bus"?"Bus time":parseMeta(p.detail).text||(CATS[p.category]?CATS[p.category].label:"Place"),phone:p.phone,address:p.address,image:p.image_url,cat:p.category,created:p.created_at,t:(m=>({opening_hours:m.hrs,bus:m.rows.length?"":m.bt,rows:m.rows}))(parseMeta(p.detail)),d:null}))
+    comm=(await res.json()).map(p=>({comm:1,id:p.id,user_id:p.user_id,owner:p.owner_name,lat:p.lat,lon:p.lon,name:p.name,type:p.category==="bus"?"Bus time":p.category==="blood"?(m=>m.bl?m.bl.split("^").reverse().join(" · "):"Blood donor")(parseMeta(p.detail)):parseMeta(p.detail).text||(CATS[p.category]?CATS[p.category].label:"Place"),phone:p.phone,address:p.address,image:p.image_url,cat:p.category,created:p.created_at,t:(m=>({opening_hours:m.hrs,bus:m.rows.length?"":m.bt,rows:m.rows}))(parseMeta(p.detail)),bl:parseMeta(p.detail).bl,d:null}))
   }catch(e){}}
 const OSM_KEYS=["phone","contact:phone","opening_hours","addr:housename","addr:street","addr:suburb","addr:city"];
 async function fetchDbOsm(r){
@@ -385,28 +421,14 @@ function saveOsm(list,dbl){
   const rows=list.map(i=>({k:pkey(i),n:i.name,ty:i.type,c:i.cat,la:+i.lat,lo:+i.lon,tg:Object.fromEntries(OSM_KEYS.filter(k=>i.t[k]).map(k=>[k,String(i.t[k]).slice(0,120)]))}))
     .filter(r=>{const u=known[r.k];return !u||Date.now()-new Date(u)>7*864e5}).slice(0,500);
   if(rows.length)rpc("save_osm_places",{p_items:rows}).catch(()=>{})}
-async function load(){
-  if(!loc){render();return}
-  const rad=+$("#rad").value,r=(rad>0?rad:5)*1000,key=[cat,loc.lat.toFixed(3),loc.lon.toFixed(3),r].join("|"),my=++busy;
-  status("Searching nearby places…");
-  let osm=cache.get(key);
-  if(!osm){
-    const dbl=await fetchDbOsm(r);
-    if(my!==busy)return;
-    if(dbl.length){osmFail=false;items=cat==="all"?capAll(dbl):dbl;render()}
-    osm=await fetchOSM(r);
-    if(osm){cache.set(key,osm);saveOsm(osm,dbl)}
-    else if(dbl.length)osm=cat==="all"?capAll(dbl):dbl
-  }
-  if(my!==busy)return;
-  osmFail=!osm;items=osm||[];render()}
+async function load(){items=[];osmFail=false;render()}
 
 const waNum=p=>{let d=p.replace(/\D/g,"").replace(/^0+/,"");if(d.length===10)d="91"+d;return d};
 function card(i,k){
   const ph=(i.comm?i.phone:(i.t.phone||i.t["contact:phone"]||"")).split(";")[0].trim();
   const addr=i.comm?(i.address||""):[i.t["addr:housename"],i.t["addr:street"],i.t["addr:suburb"]||i.t["addr:city"]].filter(Boolean).join(", ");
   const own=i.comm&&me&&i.user_id===me.id,c=i.cat||cat,ico=(CATS[c]||CATS.all).ico,key=pkey(i),ri=rinfo(key);
-  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${i.t.bus?`<small>🚌 ${esc(i.t.bus)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div>${i.t.rows&&i.t.rows.length?ttHTML(i.t.rows,i.name):""}<div class="act"><a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener" aria-label="Directions" title="Directions">${IC.dir}</a>${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}" aria-label="Call" title="Call">${IC.call}</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${IC.wa}</a>`:""}<a class="alt rv" href="#" data-rev="${esc(key)}" data-n="${esc(i.name||i.type)}" aria-label="Rate and comment" title="Rate and comment">${IC.star}${ri?`<span>${ri.avg.toFixed(1)}</span>`:""}</a></div></div>`}
+  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${i.t.bus?`<small>🚌 ${esc(i.t.bus)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div>${i.t.rows&&i.t.rows.length?ttHTML(i.t.rows,i.name):""}<div class="act">${NOLOC.has(c)?"":`<a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener" aria-label="Directions" title="Directions">${IC.dir}</a>`}${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}" aria-label="Call" title="Call">${IC.call}</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${IC.wa}</a>`:""}<a class="alt rv" href="#" data-rev="${esc(key)}" data-n="${esc(i.name||i.type)}" aria-label="Rate and comment" title="Rate and comment">${IC.star}${ri?`<span>${ri.avg.toFixed(1)}</span>`:""}</a></div></div>`}
 $("#list").onclick=e=>{
   const z=e.target.closest("[data-zoom]");
   if(z){openMod(`<img src="${esc(z.dataset.zoom)}" alt="" style="width:100%;border-radius:14px;margin-top:20px">`);return}
@@ -416,8 +438,9 @@ $("#list").onclick=e=>{
 function render(){
   const f=$("#f").value.trim().toLowerCase(),rad=+$("#rad").value;
   let all=[...comm,...items].filter(i=>cat==="all"||i.cat===cat);
-  all.forEach(i=>i.d=loc?km(loc.lat,loc.lon,i.lat,i.lon):null);
-  if(rad>0&&loc)all=all.filter(i=>i.d<=rad);
+  all.forEach(i=>i.d=(loc&&!NOLOC.has(i.cat))?km(loc.lat,loc.lon,i.lat,i.lon):null);
+  if(rad>0&&loc)all=all.filter(i=>NOLOC.has(i.cat)||i.d<=rad);
+  if(cat==="blood"){const dq=$("#bd").value.trim().toLowerCase(),bg=$("#bg").value;all=all.filter(i=>{const[d="",g=""]=(i.bl||"").split("^");return(!dq||d.toLowerCase().includes(dq))&&(!bg||g===bg)})}
   if(f)all=all.filter(i=>[i.name,i.type,i.address,i.phone,i.owner,CATS[i.cat]?CATS[i.cat].label:""].join(" ").toLowerCase().includes(f));
   let sort=$("#sort").value;if(sort==="near"&&!loc)sort="newest";
   const by={
@@ -427,7 +450,7 @@ function render(){
     cat:(a,b)=>(a.cat||"").localeCompare(b.cat||"")||(a.d||0)-(b.d||0)};
   all.sort(by[sort]);
   const lab=cat==="all"?"places":CATS[cat].label.toLowerCase(),sn={near:"nearest first",newest:"newest first",name:"A to Z",cat:"by category"}[sort];
-  status(all.length?`${all.length} ${lab}${rad>0&&loc?` within ${rad} km`:""}, ${sn}${!loc?". Allow location or search an area to see distances and nearby places":""}${osmFail?" (map data unavailable)":""}`:"");
+  status(all.length?`${all.length} ${lab}${rad>0&&loc?` within ${rad} km`:""}, ${sn}${!loc?". Allow location or search an area to see distances":""}${osmFail?" (map data unavailable)":""}`:"");
   $("#list").innerHTML=all.slice(0,200).map((x,k)=>card(x,k)).join("")||'<div class="empty"><div class="eg">🔎</div>Nothing found.<br>Try another category or search, or add a place with the + button.</div>'}
 
 /* ---------- Photo helper ---------- */
@@ -558,10 +581,11 @@ function openAdd(){
   $("#a-gps").onclick=()=>{$("#a-err").textContent="Getting location…";
     getPos(p=>{aLoc={lat:p.coords.latitude,lon:p.coords.longitude};aPlace="";showL();$("#a-err").textContent=""},m=>$("#a-err").textContent=m)};
   $("#a-save").onclick=async()=>{
-    const err=$("#a-err"),isBus=$("#a-cat").value==="bus";let name=$("#a-name").value.trim();err.textContent="";
+    const err=$("#a-err"),isBus=$("#a-cat").value==="bus",isBlood=$("#a-cat").value==="blood";let name=$("#a-name").value.trim();err.textContent="";
     if(isBus){name=busTitle("a");if(!name){err.textContent="Enter the bus name and add at least one place and time";return}}
     else if(!name){err.textContent="Enter a name";return}
-    if(!aLoc){err.textContent="Tap Use my GPS or search the exact location first";return}
+    if(isBlood){const[dd,gg]=bloodVal("a");if(!name){err.textContent="Enter the donor name";return}if(!dd){err.textContent="Enter the district";return}if(!gg){err.textContent="Choose the blood group";return}if(!$("#a-phone").value.trim()){err.textContent="Enter the contact number";return}}
+    if(!aLoc&&!NOLOC.has($("#a-cat").value)){err.textContent="Tap Use my GPS or search the exact location first";return}
     const b=$("#a-save");b.disabled=true;
     try{
       const c=$("#a-cat").value;
@@ -572,9 +596,9 @@ function openAdd(){
         const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:aImg});
         if(!up.ok){err.textContent="Photo upload failed. Try again or save without a photo.";b.disabled=false;b.textContent="Save place";return}
         imgUrl=`${URL_}/storage/v1/object/public/media/${path}`}
-      const r=await rpc("add_place",{p_mobile:me.mobile,p_hash:me.hash,p_category:c,p_name:name,p_phone:isBus?"":$("#a-phone").value.trim(),p_detail:encMeta($("#a-detail").value.trim(),hoursVal("a")),p_address:isBus?"":$("#a-addr").value.trim(),p_lat:aLoc.lat,p_lon:aLoc.lon,p_image:imgUrl});
+      const r=await rpc("add_place",{p_mobile:me.mobile,p_hash:me.hash,p_category:c,p_name:name,p_phone:isBus?"":$("#a-phone").value.trim(),p_detail:encMeta($("#a-detail").value.trim(),hoursVal("a")),p_address:(isBus||isBlood)?"":$("#a-addr").value.trim(),p_lat:NOLOC.has(c)?0:aLoc.lat,p_lon:NOLOC.has(c)?0:aLoc.lon,p_image:imgUrl});
       if(r.error){err.textContent=r.error;b.disabled=false;b.textContent="Save place";return}
-      loc={lat:aLoc.lat,lon:aLoc.lon};$("#where").textContent="📍 Showing "+name;
+      if(!NOLOC.has(c)){loc={lat:aLoc.lat,lon:aLoc.lon};$("#where").textContent="📍 Showing "+name}
       setCat(c);closeMod();toast("Place added");loadComm().then(()=>{render();load()})
     }catch(e){err.textContent=e.message;b.disabled=false}}}
 $("#add").onclick=openAdd;
@@ -600,7 +624,7 @@ function openEdit(p){
     <div class="locrow"><span id="e-loc"></span><button class="btn alt sm" id="e-gps">Use my GPS</button></div>
     <div class="err" id="e-err"></div>
     <div class="two"><button class="btn alt" id="e-cancel">Cancel</button><button class="btn" id="e-save">Save</button></div>`);
-  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";{const m=parseMeta(p.detail);$("#e-detail").value=m.text;$("#e-open").value=m.o;$("#e-close").value=m.c;$("#e-off").value=m.w}wireHours("e");setBusRows("e",parseMeta(p.detail).rows);{const m=parseMeta(p.detail);if(p.category==="bus"&&!m.text&&m.rows[0]&&m.rows[0].n)$("#e-detail").value=m.rows[0].n}$("#e-addr").value=p.address||"";
+  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";{const m=parseMeta(p.detail);$("#e-detail").value=m.text;$("#e-open").value=m.o;$("#e-close").value=m.c;$("#e-off").value=m.w}wireHours("e");setBusRows("e",parseMeta(p.detail).rows);{const m=parseMeta(p.detail);const[dd="",gg=""]=m.bl.split("^");$("#e-dist").value=dd;$("#e-grp").value=gg}{const m=parseMeta(p.detail);if(p.category==="bus"&&!m.text&&m.rows[0]&&m.rows[0].n)$("#e-detail").value=m.rows[0].n}$("#e-addr").value=p.address||"";
   let eLoc={lat:p.lat,lon:p.lon},ePlace="",eImg=null;
   if(p.image_url){const v=$("#e-pv");v.src=p.image_url;v.style.display="block"}else $("#e-pk").textContent="📷 Add a photo (optional)";
   $("#e-img").onchange=async e=>{
@@ -621,9 +645,10 @@ function openEdit(p){
     getPos(g=>{eLoc={lat:g.coords.latitude,lon:g.coords.longitude};ePlace="";showE();$("#e-err").textContent=""},m=>$("#e-err").textContent=m)};
   $("#e-cancel").onclick=openMine;
   $("#e-save").onclick=async()=>{
-    const err=$("#e-err"),isBus=$("#e-cat").value==="bus";let name=$("#e-name").value.trim();err.textContent="";
+    const err=$("#e-err"),isBus=$("#e-cat").value==="bus",isBlood=$("#e-cat").value==="blood";let name=$("#e-name").value.trim();err.textContent="";
     if(isBus){name=busTitle("e");if(!name){err.textContent="Enter the bus name and add at least one place and time";return}}
     else if(!name){err.textContent="Enter a name";return}
+    if(isBlood){const[dd,gg]=bloodVal("e");if(!name){err.textContent="Enter the donor name";return}if(!dd){err.textContent="Enter the district";return}if(!gg){err.textContent="Choose the blood group";return}if(!$("#e-phone").value.trim()){err.textContent="Enter the contact number";return}}
     const b=$("#e-save");b.disabled=true;
     try{
       let imgUrl=p.image_url||null;
@@ -633,7 +658,7 @@ function openEdit(p){
         const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:eImg});
         if(!up.ok){err.textContent="Photo upload failed. Try again or save without changing the photo.";b.disabled=false;b.textContent="Save";return}
         imgUrl=`${URL_}/storage/v1/object/public/media/${path}`}
-      const r=await rpc("update_place",{p_mobile:me.mobile,p_hash:me.hash,p_id:p.id,p_category:$("#e-cat").value,p_name:name,p_phone:isBus?"":$("#e-phone").value.trim(),p_detail:encMeta($("#e-detail").value.trim(),hoursVal("e")),p_address:isBus?"":$("#e-addr").value.trim(),p_lat:eLoc.lat,p_lon:eLoc.lon,p_image:imgUrl});
+      const r=await rpc("update_place",{p_mobile:me.mobile,p_hash:me.hash,p_id:p.id,p_category:$("#e-cat").value,p_name:name,p_phone:isBus?"":$("#e-phone").value.trim(),p_detail:encMeta($("#e-detail").value.trim(),hoursVal("e")),p_address:(isBus||isBlood)?"":$("#e-addr").value.trim(),p_lat:eLoc.lat,p_lon:eLoc.lon,p_image:imgUrl});
       if(r&&r.error){err.textContent=r.error;b.disabled=false;b.textContent="Save";return}
       if(eImg&&p.image_url){const ip=p.image_url.split("/object/public/media/")[1];if(ip)fetch(`${URL_}/storage/v1/object/media/${ip}`,{method:"DELETE",headers:{apikey:KEY}}).catch(()=>{})}
       toast("Saved");loadComm().then(()=>{render();load()});openMine()
