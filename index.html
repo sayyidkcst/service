@@ -57,6 +57,8 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .set{margin-top:18px}.set h3{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}.avrow{display:flex;align-items:center;gap:14px}.note{font-size:13px;color:var(--mut);margin-top:8px}
 .dots{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}.dots button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 2px var(--bg)}.dots button.on{border-color:var(--fg)}
 .about{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card);line-height:1.5}.about .lg{font-size:26px}.about b{display:block;font-size:16px}.about span{display:block;color:var(--mut);font-size:14px}
+table.tt.big{font-size:15px}table.tt.big td,table.tt.big th{padding:10px 8px}table.tt tr.nx td{background:color-mix(in srgb,var(--acc2) 16%,transparent);font-weight:700}
+.tw{margin-top:10px;max-height:55dvh;overflow-y:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 table.tt{width:100%;border-collapse:collapse;font-size:13px}table.tt th,table.tt td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}table.tt th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.4px}table.tt td:last-child,table.tt th:last-child{text-align:right;white-space:nowrap;font-weight:700}
 .ttw,.ttd{padding:0 14px 6px}.ttd summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0;color:var(--acc)}
 .bt-h,.bt-r{display:grid;grid-template-columns:1fr 98px 26px;gap:6px;align-items:center;margin-top:6px}.bt-h span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
@@ -349,6 +351,9 @@ const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),b=$("#"+x+"-bus"),
   if(!box.children.length)setBusRows(x);
   $("#"+x+"-addrow").onclick=()=>addBusRow(x);
   box.onclick=e=>{const b=e.target.closest(".bx");if(!b)return;if(box.children.length>1)b.parentNode.remove();else{b.parentNode.querySelectorAll("input").forEach(i=>i.value="")}}};
+const busRows=x=>[...document.querySelectorAll("#"+x+"-rows .bt-r")].map(r=>({p:r.querySelector(".bp").value.replace(/[\r\n]+/g," ").trim(),t:r.querySelector(".bm").value})).filter(r=>r.p||r.t);
+const saveBusTimes=(id,rows)=>rpc("set_bus_times",{p_mobile:me.mobile,p_hash:me.hash,p_place_id:id,p_rows:rows});
+async function newestBusId(){const r=await fetch(`${URL_}/rest/v1/places?select=id&user_id=eq.${encodeURIComponent(me.id)}&category=eq.bus&order=id.desc&limit=1`,{headers:{apikey:KEY}});const j=await r.json();return j[0]&&j[0].id}
 const bloodVal=x=>{const [d,g]=[$("#"+x+"-dist").value,$("#"+x+"-grp").value].map(v=>v.replace(/[|~^\r\n]+/g," ").trim());return [DISTRICTS.find(k=>k.toLowerCase()===d.toLowerCase())||d,g]};
 const hoursVal=x=>{const c=$("#"+x+"-cat").value;return c==="shop"?[$("#"+x+"-open").value,$("#"+x+"-close").value,$("#"+x+"-off").value,"",""]:c==="blood"?["","","","",bloodVal(x).join("^")]:c==="bus"?["","","",[...document.querySelectorAll("#"+x+"-rows .bt-r")].map(r=>[".bp",".bm"].map(q=>r.querySelector(q).value.replace(/[|~^\r\n]+/g," ").trim())).filter(a=>a.some(Boolean)).map(a=>a.join("^")).join("~"),""]:["","","","",""]};
 const IC={
@@ -404,7 +409,9 @@ async function loadComm(){
   try{
     const res=await fetch(`${URL_}/rest/v1/places?select=*&order=created_at.desc&limit=1000`,{headers:{apikey:KEY}});
     if(!res.ok)return;
-    comm=(await res.json()).map(p=>({comm:1,id:p.id,user_id:p.user_id,owner:p.owner_name,lat:p.lat,lon:p.lon,name:p.name,type:p.category==="bus"?"Bus time":p.category==="blood"?(m=>m.bl?m.bl.split("^").reverse().join(" · "):"Blood donor")(parseMeta(p.detail)):parseMeta(p.detail).text||(CATS[p.category]?CATS[p.category].label:"Place"),phone:p.phone,address:p.address,image:p.image_url,cat:p.category,created:p.created_at,t:(m=>({opening_hours:m.hrs,bus:m.rows.length?"":m.bt,rows:m.rows}))(parseMeta(p.detail)),bl:parseMeta(p.detail).bl,d:null}))
+    const bm={};
+    try{const r2=await fetch(`${URL_}/rest/v1/bus_times?select=place_id,place,depart_time&order=depart_time.asc&limit=5000`,{headers:{apikey:KEY}});if(r2.ok)(await r2.json()).forEach(x=>(bm[x.place_id]=bm[x.place_id]||[]).push({n:"",p:x.place,t:x.depart_time}))}catch(e){}
+    comm=(await res.json()).map(p=>({comm:1,id:p.id,user_id:p.user_id,owner:p.owner_name,lat:p.lat,lon:p.lon,name:p.name,type:p.category==="bus"?"Bus time":p.category==="blood"?(m=>m.bl?m.bl.split("^").reverse().join(" · "):"Blood donor")(parseMeta(p.detail)):parseMeta(p.detail).text||(CATS[p.category]?CATS[p.category].label:"Place"),phone:p.phone,address:p.address,image:p.image_url,cat:p.category,created:p.created_at,t:(m=>({opening_hours:m.hrs,bus:m.rows.length?"":m.bt,rows:m.rows}))(parseMeta(p.detail)),bl:parseMeta(p.detail).bl,d:null}));comm.forEach(c=>{if(c.cat==="bus"&&bm[c.id]&&bm[c.id].length)c.t.rows=bm[c.id]})
   }catch(e){}}
 const OSM_KEYS=["phone","contact:phone","opening_hours","addr:housename","addr:street","addr:suburb","addr:city"];
 async function fetchDbOsm(r){
@@ -424,14 +431,28 @@ function saveOsm(list,dbl){
 async function load(){items=[];osmFail=false;render()}
 
 const waNum=p=>{let d=p.replace(/\D/g,"").replace(/^0+/,"");if(d.length===10)d="91"+d;return d};
+const BUS={};
+function openBus(i){
+  if(!i)return;
+  const rs=[...i.t.rows].sort((a,b)=>(a.t||"99").localeCompare(b.t||"99")),withN=rs.some(r=>r.n);
+  const mins=t=>{const m=/^(\d{1,2}):(\d{2})$/.exec(t||"");return m?+m[1]*60+ +m[2]:null};
+  const now=new Date(),nm=now.getHours()*60+now.getMinutes();
+  const nx=rs.findIndex(r=>mins(r.t)!=null&&mins(r.t)>=nm);
+  openMod(`<h2>🚌 ${esc(i.name)}</h2>
+    <p class="sub">${rs.length} timing${rs.length>1?"s":""}${nx>=0?` · Next: <b>${esc(t12(rs[nx].t))}</b> at ${esc(rs[nx].p)}`:" · No more buses today"}</p>
+    <div class="tw"><table class="tt big"><thead><tr>${withN?"<th>Bus</th>":""}<th>Place</th><th>Time</th></tr></thead><tbody>${rs.map((r,k)=>`<tr${k===nx?' class="nx"':""}>${withN?`<td>${esc(r.n||i.name)}</td>`:""}<td>${esc(r.p)}</td><td>${esc(/^\d{1,2}:\d{2}$/.test(r.t)?t12(r.t):r.t)}</td></tr>`).join("")}</tbody></table></div>
+    <button class="btn full alt" id="bt-x" type="button">Close</button>`);
+  $("#bt-x").onclick=closeMod}
 function card(i,k){
   const ph=(i.comm?i.phone:(i.t.phone||i.t["contact:phone"]||"")).split(";")[0].trim();
   const addr=i.comm?(i.address||""):[i.t["addr:housename"],i.t["addr:street"],i.t["addr:suburb"]||i.t["addr:city"]].filter(Boolean).join(", ");
   const own=i.comm&&me&&i.user_id===me.id,c=i.cat||cat,ico=(CATS[c]||CATS.all).ico,key=pkey(i),ri=rinfo(key);
-  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${i.t.bus?`<small>🚌 ${esc(i.t.bus)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div>${i.t.rows&&i.t.rows.length?ttHTML(i.t.rows,i.name):""}<div class="act">${NOLOC.has(c)?"":`<a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener" aria-label="Directions" title="Directions">${IC.dir}</a>`}${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}" aria-label="Call" title="Call">${IC.call}</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${IC.wa}</a>`:""}<a class="alt rv" href="#" data-rev="${esc(key)}" data-n="${esc(i.name||i.type)}" aria-label="Rate and comment" title="Rate and comment">${IC.star}${ri?`<span>${ri.avg.toFixed(1)}</span>`:""}</a></div></div>`}
+  if(i.t.rows&&i.t.rows.length)BUS[key]=i;
+  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${i.t.bus?`<small>🚌 ${esc(i.t.bus)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div>${i.t.rows&&i.t.rows.length?`<div class="ttw"><button class="btn alt full" data-bus="${esc(key)}" type="button" style="margin-top:6px">🚌 View timetable · ${i.t.rows.length} timing${i.t.rows.length>1?"s":""}</button></div>`:""}<div class="act">${NOLOC.has(c)?"":`<a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener" aria-label="Directions" title="Directions">${IC.dir}</a>`}${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}" aria-label="Call" title="Call">${IC.call}</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${IC.wa}</a>`:""}<a class="alt rv" href="#" data-rev="${esc(key)}" data-n="${esc(i.name||i.type)}" aria-label="Rate and comment" title="Rate and comment">${IC.star}${ri?`<span>${ri.avg.toFixed(1)}</span>`:""}</a></div></div>`}
 $("#list").onclick=e=>{
   const z=e.target.closest("[data-zoom]");
   if(z){openMod(`<img src="${esc(z.dataset.zoom)}" alt="" style="width:100%;border-radius:14px;margin-top:20px">`);return}
+  const bt=e.target.closest("[data-bus]");if(bt){e.preventDefault();openBus(BUS[bt.dataset.bus]);return}
   const rv=e.target.closest("[data-rev]");if(rv){e.preventDefault();openReviews(rv.dataset.rev,rv.dataset.n);return}
   const a=e.target.closest("[data-del]");if(!a)return;e.preventDefault();confirmDel(+a.dataset.del,a.dataset.n,null,a.dataset.img)};
 
@@ -584,6 +605,7 @@ function openAdd(){
     const err=$("#a-err"),isBus=$("#a-cat").value==="bus",isBlood=$("#a-cat").value==="blood";let name=$("#a-name").value.trim();err.textContent="";
     if(isBus){name=busTitle("a");if(!name){err.textContent="Enter the bus name and add at least one place and time";return}}
     else if(!name){err.textContent="Enter a name";return}
+    if(isBus&&busRows("a").some(r=>!r.p||!r.t)){err.textContent="Each row needs a place and a time";return}
     if(isBlood){const[dd,gg]=bloodVal("a");if(!name){err.textContent="Enter the donor name";return}if(!dd){err.textContent="Enter the district";return}if(!gg){err.textContent="Choose the blood group";return}if(!$("#a-phone").value.trim()){err.textContent="Enter the contact number";return}}
     if(!aLoc&&!NOLOC.has($("#a-cat").value)){err.textContent="Tap Use my GPS or search the exact location first";return}
     const b=$("#a-save");b.disabled=true;
@@ -596,10 +618,12 @@ function openAdd(){
         const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:aImg});
         if(!up.ok){err.textContent="Photo upload failed. Try again or save without a photo.";b.disabled=false;b.textContent="Save place";return}
         imgUrl=`${URL_}/storage/v1/object/public/media/${path}`}
-      const r=await rpc("add_place",{p_mobile:me.mobile,p_hash:me.hash,p_category:c,p_name:name,p_phone:isBus?"":$("#a-phone").value.trim(),p_detail:encMeta($("#a-detail").value.trim(),hoursVal("a")),p_address:(isBus||isBlood)?"":$("#a-addr").value.trim(),p_lat:NOLOC.has(c)?0:aLoc.lat,p_lon:NOLOC.has(c)?0:aLoc.lon,p_image:imgUrl});
+      const r=await rpc("add_place",{p_mobile:me.mobile,p_hash:me.hash,p_category:c,p_name:name,p_phone:isBus?"":$("#a-phone").value.trim(),p_detail:encMeta($("#a-detail").value.trim(),isBus?["","","","",""]:hoursVal("a")),p_address:(isBus||isBlood)?"":$("#a-addr").value.trim(),p_lat:NOLOC.has(c)?0:aLoc.lat,p_lon:NOLOC.has(c)?0:aLoc.lon,p_image:imgUrl});
       if(r.error){err.textContent=r.error;b.disabled=false;b.textContent="Save place";return}
+      let busWarn="";
+      if(isBus){try{const pid=(await newestBusId())||(r&&(r.id||r.place_id));if(!pid)throw new Error("could not find the new bus");const rr=await saveBusTimes(pid,busRows("a"));if(rr&&rr.error)throw new Error(rr.error)}catch(e2){busWarn=e2.message}}
       if(!NOLOC.has(c)){loc={lat:aLoc.lat,lon:aLoc.lon};$("#where").textContent="📍 Showing "+name}
-      setCat(c);closeMod();toast("Place added");loadComm().then(()=>{render();load()})
+      setCat(c);closeMod();toast(busWarn?"Bus added, but the times were not saved: "+busWarn:"Place added");loadComm().then(()=>{render();load()})
     }catch(e){err.textContent=e.message;b.disabled=false}}}
 $("#add").onclick=openAdd;
 
@@ -624,7 +648,8 @@ function openEdit(p){
     <div class="locrow"><span id="e-loc"></span><button class="btn alt sm" id="e-gps">Use my GPS</button></div>
     <div class="err" id="e-err"></div>
     <div class="two"><button class="btn alt" id="e-cancel">Cancel</button><button class="btn" id="e-save">Save</button></div>`);
-  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";{const m=parseMeta(p.detail);$("#e-detail").value=m.text;$("#e-open").value=m.o;$("#e-close").value=m.c;$("#e-off").value=m.w}wireHours("e");setBusRows("e",parseMeta(p.detail).rows);{const m=parseMeta(p.detail);const[dd="",gg=""]=m.bl.split("^");$("#e-dist").value=dd;$("#e-grp").value=gg}{const m=parseMeta(p.detail);if(p.category==="bus"&&!m.text&&m.rows[0]&&m.rows[0].n)$("#e-detail").value=m.rows[0].n}$("#e-addr").value=p.address||"";
+  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";{const m=parseMeta(p.detail);$("#e-detail").value=m.text;$("#e-open").value=m.o;$("#e-close").value=m.c;$("#e-off").value=m.w}wireHours("e");setBusRows("e",parseMeta(p.detail).rows);{const m=parseMeta(p.detail);const[dd="",gg=""]=m.bl.split("^");$("#e-dist").value=dd;$("#e-grp").value=gg}
+  if(p.category==="bus")fetch(`${URL_}/rest/v1/bus_times?select=place,depart_time&place_id=eq.${p.id}&order=depart_time.asc`,{headers:{apikey:KEY}}).then(r=>r.ok?r.json():[]).then(rows=>{if(rows.length)setBusRows("e",rows.map(x=>({p:x.place,t:x.depart_time})))}).catch(()=>{});{const m=parseMeta(p.detail);if(p.category==="bus"&&!m.text&&m.rows[0]&&m.rows[0].n)$("#e-detail").value=m.rows[0].n}$("#e-addr").value=p.address||"";
   let eLoc={lat:p.lat,lon:p.lon},ePlace="",eImg=null;
   if(p.image_url){const v=$("#e-pv");v.src=p.image_url;v.style.display="block"}else $("#e-pk").textContent="📷 Add a photo (optional)";
   $("#e-img").onchange=async e=>{
@@ -648,6 +673,7 @@ function openEdit(p){
     const err=$("#e-err"),isBus=$("#e-cat").value==="bus",isBlood=$("#e-cat").value==="blood";let name=$("#e-name").value.trim();err.textContent="";
     if(isBus){name=busTitle("e");if(!name){err.textContent="Enter the bus name and add at least one place and time";return}}
     else if(!name){err.textContent="Enter a name";return}
+    if(isBus&&busRows("e").some(r=>!r.p||!r.t)){err.textContent="Each row needs a place and a time";return}
     if(isBlood){const[dd,gg]=bloodVal("e");if(!name){err.textContent="Enter the donor name";return}if(!dd){err.textContent="Enter the district";return}if(!gg){err.textContent="Choose the blood group";return}if(!$("#e-phone").value.trim()){err.textContent="Enter the contact number";return}}
     const b=$("#e-save");b.disabled=true;
     try{
@@ -658,8 +684,9 @@ function openEdit(p){
         const up=await fetch(`${URL_}/storage/v1/object/media/${path}`,{method:"POST",headers:{apikey:KEY,"Content-Type":"image/jpeg"},body:eImg});
         if(!up.ok){err.textContent="Photo upload failed. Try again or save without changing the photo.";b.disabled=false;b.textContent="Save";return}
         imgUrl=`${URL_}/storage/v1/object/public/media/${path}`}
-      const r=await rpc("update_place",{p_mobile:me.mobile,p_hash:me.hash,p_id:p.id,p_category:$("#e-cat").value,p_name:name,p_phone:isBus?"":$("#e-phone").value.trim(),p_detail:encMeta($("#e-detail").value.trim(),hoursVal("e")),p_address:(isBus||isBlood)?"":$("#e-addr").value.trim(),p_lat:eLoc.lat,p_lon:eLoc.lon,p_image:imgUrl});
+      const r=await rpc("update_place",{p_mobile:me.mobile,p_hash:me.hash,p_id:p.id,p_category:$("#e-cat").value,p_name:name,p_phone:isBus?"":$("#e-phone").value.trim(),p_detail:encMeta($("#e-detail").value.trim(),isBus?["","","","",""]:hoursVal("e")),p_address:(isBus||isBlood)?"":$("#e-addr").value.trim(),p_lat:eLoc.lat,p_lon:eLoc.lon,p_image:imgUrl});
       if(r&&r.error){err.textContent=r.error;b.disabled=false;b.textContent="Save";return}
+      if(isBus){const rr=await saveBusTimes(p.id,busRows("e"));if(rr&&rr.error){err.textContent=rr.error;b.disabled=false;b.textContent="Save";return}}
       if(eImg&&p.image_url){const ip=p.image_url.split("/object/public/media/")[1];if(ip)fetch(`${URL_}/storage/v1/object/media/${ip}`,{method:"DELETE",headers:{apikey:KEY}}).catch(()=>{})}
       toast("Saved");loadComm().then(()=>{render();load()});openMine()
     }catch(e){err.textContent=e.message;b.disabled=false}}}
