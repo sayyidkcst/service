@@ -58,6 +58,7 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .dots{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}.dots button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 2px var(--bg)}.dots button.on{border-color:var(--fg)}
 .about{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card);line-height:1.5}.about .lg{font-size:26px}.about b{display:block;font-size:16px}.about span{display:block;color:var(--mut);font-size:14px}
 table.tt.big{font-size:15px}table.tt.big td,table.tt.big th{padding:10px 8px}table.tt tr.nx td{background:color-mix(in srgb,var(--acc2) 16%,transparent);font-weight:700}
+.nxt{margin:4px 0 0;padding:8px 12px;border-radius:12px;background:color-mix(in srgb,var(--acc2) 14%,transparent);font-size:14px;line-height:1.4}
 .tw{margin-top:10px;max-height:55dvh;overflow-y:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 table.tt{width:100%;border-collapse:collapse;font-size:13px}table.tt th,table.tt td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}table.tt th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.4px}table.tt td:last-child,table.tt th:last-child{text-align:right;white-space:nowrap;font-weight:700}
 .ttw,.ttd{padding:0 14px 6px}.ttd summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0;color:var(--acc)}
@@ -432,6 +433,15 @@ async function load(){items=[];osmFail=false;render()}
 
 const waNum=p=>{let d=p.replace(/\D/g,"").replace(/^0+/,"");if(d.length===10)d="91"+d;return d};
 const BUS={};
+const hmin=t=>{const m=/^(\d{1,2}):(\d{2})$/.exec(t||"");return m?+m[1]*60+ +m[2]:null};
+function nextLine(rows){
+  const now=new Date(),nm=now.getHours()*60+now.getMinutes();
+  const rs=rows.map(r=>({r,m:hmin(r.t)})).filter(x=>x.m!=null).sort((a,b)=>a.m-b.m);
+  if(!rs.length)return"";
+  const n=rs.find(x=>x.m>=nm),tom=!n,x=n||rs[0],d=tom?x.m+1440-nm:x.m-nm;
+  if(d===0)return`⏱ <b>Departing now</b> · ${esc(x.r.p)}`;
+  return`⏱ <b>Next: ${tom?"tomorrow ":""}${esc(t12(x.r.t))}</b> · ${esc(x.r.p)}${d<60?` <span style="color:var(--mut)">(in ${d} min)</span>`:""}`}
+setInterval(()=>{document.querySelectorAll("[data-nx]").forEach(el=>{const i=BUS[el.dataset.nx];if(i)el.innerHTML=nextLine(i.t.rows)})},30000);
 function openBus(i){
   if(!i)return;
   const rs=[...i.t.rows].sort((a,b)=>(a.t||"99").localeCompare(b.t||"99")),withN=rs.some(r=>r.n);
@@ -448,7 +458,7 @@ function card(i,k){
   const addr=i.comm?(i.address||""):[i.t["addr:housename"],i.t["addr:street"],i.t["addr:suburb"]||i.t["addr:city"]].filter(Boolean).join(", ");
   const own=i.comm&&me&&i.user_id===me.id,c=i.cat||cat,ico=(CATS[c]||CATS.all).ico,key=pkey(i),ri=rinfo(key);
   if(i.t.rows&&i.t.rows.length)BUS[key]=i;
-  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${i.t.bus?`<small>🚌 ${esc(i.t.bus)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div>${i.t.rows&&i.t.rows.length?`<div class="ttw"><button class="btn alt full" data-bus="${esc(key)}" type="button" style="margin-top:6px">🚌 View timetable · ${i.t.rows.length} timing${i.t.rows.length>1?"s":""}</button></div>`:""}<div class="act">${NOLOC.has(c)?"":`<a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener" aria-label="Directions" title="Directions">${IC.dir}</a>`}${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}" aria-label="Call" title="Call">${IC.call}</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${IC.wa}</a>`:""}<a class="alt rv" href="#" data-rev="${esc(key)}" data-n="${esc(i.name||i.type)}" aria-label="Rate and comment" title="Rate and comment">${IC.star}${ri?`<span>${ri.avg.toFixed(1)}</span>`:""}</a></div></div>`}
+  return `<div class="card" style="--i:${Math.min(k||0,10)}">${i.comm&&i.image?`<img class="media" src="${esc(i.image)}" alt="" loading="lazy" data-zoom="${esc(i.image)}">`:""}<div class="cb"><div class="ico" style="--c:${COL[c]||COL.all}">${ico}</div><div class="in"><div class="tr">${i.d!=null?`<span class="dist">${fmtD(i.d)}</span>`:""}</div><b>${esc(i.name||"Unnamed "+i.type.toLowerCase())}</b><span class="t">${esc(i.type)}</span>${addr?`<small>📍 ${esc(addr)}</small>`:""}${i.t.opening_hours?`<small>🕒 ${esc(i.t.opening_hours)}</small>`:""}${i.t.bus?`<small>🚌 ${esc(i.t.bus)}</small>`:""}${ph?`<small>📞 ${esc(ph)}</small>`:""}${i.comm&&i.owner?`<small>Added by ${esc(i.owner)}</small>`:""}</div></div>${i.t.rows&&i.t.rows.length?`<div class="ttw"><div class="nxt" data-nx="${esc(key)}">${nextLine(i.t.rows)}</div><button class="btn alt full" data-bus="${esc(key)}" type="button" style="margin-top:6px">🚌 View timetable · ${i.t.rows.length} timing${i.t.rows.length>1?"s":""}</button></div>`:""}<div class="act">${NOLOC.has(c)?"":`<a href="https://www.google.com/maps/dir/?api=1&destination=${i.lat},${i.lon}" target="_blank" rel="noopener" aria-label="Directions" title="Directions">${IC.dir}</a>`}${ph?`<a class="alt" href="tel:${esc(ph.replace(/[^\d+]/g,""))}" aria-label="Call" title="Call">${IC.call}</a>`:""}${ph?`<a class="wa" href="https://wa.me/${waNum(ph)}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${IC.wa}</a>`:""}<a class="alt rv" href="#" data-rev="${esc(key)}" data-n="${esc(i.name||i.type)}" aria-label="Rate and comment" title="Rate and comment">${IC.star}${ri?`<span>${ri.avg.toFixed(1)}</span>`:""}</a></div></div>`}
 $("#list").onclick=e=>{
   const z=e.target.closest("[data-zoom]");
   if(z){openMod(`<img src="${esc(z.dataset.zoom)}" alt="" style="width:100%;border-radius:14px;margin-top:20px">`);return}
