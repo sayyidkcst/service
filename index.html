@@ -59,6 +59,20 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolli
 .about{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card);line-height:1.5}.about .lg{font-size:26px}.about b{display:block;font-size:16px}.about span{display:block;color:var(--mut);font-size:14px}
 table.tt.big{font-size:15px}table.tt.big td,table.tt.big th{padding:10px 8px}table.tt tr.nx td{background:color-mix(in srgb,var(--acc2) 16%,transparent);font-weight:700}
 .nxt{margin:4px 0 0;padding:8px 12px;border-radius:12px;background:color-mix(in srgb,var(--acc2) 14%,transparent);font-size:14px;line-height:1.4}
+.combo{position:relative;width:100%}
+.combo>input{width:100%;padding-right:42px!important}
+.filters .combo{flex:1;min-width:0}
+.combo-ar{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;background:none;color:var(--mut);display:grid;place-items:center;border-radius:10px;cursor:pointer;padding:0}
+.combo-ar svg{transition:transform .2s}.combo.open .combo-ar svg{transform:rotate(180deg)}
+.combo-list{position:fixed;z-index:1000;margin:0;padding:6px;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 16px 44px #0003;overflow-y:auto;overscroll-behavior:contain;animation:cbin .14s ease-out}
+@keyframes cbin{from{opacity:0;transform:translateY(-4px)}}
+.combo-list li{display:flex;align-items:center;gap:8px;padding:11px 12px;border-radius:10px;cursor:pointer;font-size:15px}
+.combo-list li.act,.combo-list li:hover{background:color-mix(in srgb,var(--acc2) 16%,transparent)}
+.combo-list li.all{color:var(--mut);font-weight:600}
+.combo-list li.sel{font-weight:700}.combo-list li.sel::after{content:"✓";margin-left:auto;color:var(--acc)}
+.combo-list li.free{color:var(--mut);font-style:italic}
+.combo-list li.none{color:var(--mut);cursor:default;font-size:14px}.combo-list li.none:hover{background:none}
+.combo-list mark{background:none;color:var(--acc);font-weight:700}
 .tw{margin-top:10px;max-height:55dvh;overflow-y:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 table.tt{width:100%;border-collapse:collapse;font-size:13px}table.tt th,table.tt td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}table.tt th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.4px}table.tt td:last-child,table.tt th:last-child{text-align:right;white-space:nowrap;font-weight:700}
 .ttw,.ttd{padding:0 14px 6px}.ttd summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0;color:var(--acc)}
@@ -159,8 +173,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--acc2);border-col
       <select id="rad" aria-label="Distance"><option value="0" selected>Any distance</option><option value="1">Within 1 km</option><option value="3">Within 3 km</option><option value="5">Within 5 km</option><option value="10">Within 10 km</option></select>
     </div>
     <div class="filters" id="bloodf" style="display:none">
-      <input id="bd" list="dist-list2" placeholder="All districts (tap or type)" autocomplete="off" aria-label="District"><datalist id="dist-list2"></datalist>
-      <select id="bg" aria-label="Blood group"><option value="">All blood groups</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select>
+      <input id="bd" placeholder="All districts" autocomplete="off" aria-label="District">
+      <select id="bg" aria-label="Blood group"><option value="">All blood groups</option><option>Blood Bank</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select>
     </div>
     <div id="status"></div>
     <div id="list"></div>
@@ -322,9 +336,53 @@ async function fetchOSM(r){
       return all?capAll(list):list
     }catch(e){}}
   return null}
+let OPEN=null;
+function closeCombo(){if(!OPEN)return;OPEN.list.hidden=true;OPEN.wrap.classList.remove("open");OPEN.inp.setAttribute("aria-expanded","false");OPEN=null}
+document.addEventListener("pointerdown",e=>{if(OPEN&&!OPEN.wrap.contains(e.target)&&!OPEN.list.contains(e.target))closeCombo()});
+document.addEventListener("scroll",e=>{if(OPEN&&e.target!==OPEN.list)closeCombo()},true);
+window.addEventListener("resize",closeCombo);
+const hl=(t,q)=>{const i=q?t.toLowerCase().indexOf(q.toLowerCase()):-1;return i<0?esc(t):esc(t.slice(0,i))+"<mark>"+esc(t.slice(i,i+q.length))+"</mark>"+esc(t.slice(i+q.length))};
+function combo(inp,opts,o){
+  o=o||{};
+  document.querySelectorAll(".combo-list").forEach(l=>{if(!l._inp||!l._inp.isConnected)l.remove()});
+  const wrap=document.createElement("div");wrap.className="combo";wrap.style.marginTop=inp.style.marginTop;inp.style.marginTop="0";
+  inp.parentNode.insertBefore(wrap,inp);wrap.appendChild(inp);
+  const ar=document.createElement("button");ar.type="button";ar.className="combo-ar";ar.tabIndex=-1;ar.setAttribute("aria-label","Show list");
+  ar.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>';wrap.appendChild(ar);
+  const list=document.createElement("ul");list.className="combo-list";list.setAttribute("role","listbox");list.hidden=true;list._inp=inp;document.body.appendChild(list);
+  inp.setAttribute("role","combobox");inp.setAttribute("aria-expanded","false");inp.setAttribute("autocomplete","off");
+  let act=-1,silent=false;
+  const place=()=>{
+    const r=inp.getBoundingClientRect(),below=innerHeight-r.bottom-12,above=r.top-12,up=below<200&&above>below,max=Math.max(140,Math.min(280,up?above:below));
+    list.style.left=r.left+"px";list.style.width=r.width+"px";list.style.maxHeight=max+"px";
+    if(up){list.style.top="auto";list.style.bottom=(innerHeight-r.top+6)+"px"}else{list.style.bottom="auto";list.style.top=(r.bottom+6)+"px"}};
+  const draw=all=>{
+    const q=inp.value.trim(),ql=q.toLowerCase(),exact=opts.some(x=>x.toLowerCase()===ql),showAll=all||!ql||exact;
+    const rows=[];if(o.all)rows.push({v:"",t:o.all,all:1});
+    (showAll?opts:opts.filter(x=>x.toLowerCase().includes(ql))).forEach(x=>rows.push({v:x,t:x}));
+    const free=q&&!exact&&!all;
+    list.innerHTML=rows.map((r,k)=>`<li role="option" data-k="${k}" class="${r.all?"all ":""}${r.v&&r.v.toLowerCase()===ql?"sel":""}"><span>${r.all?esc(r.t):hl(r.t,showAll?"":q)}</span></li>`).join("")
+      +(free?`<li role="option" class="free" data-free="1">Use “${esc(q)}”</li>`:"")
+      +(!rows.length&&!free?`<li class="none">No match</li>`:"");
+    list._rows=rows;act=-1;place()};
+  const open=all=>{if(OPEN&&OPEN.inp!==inp)closeCombo();draw(all);list.hidden=false;wrap.classList.add("open");inp.setAttribute("aria-expanded","true");OPEN={wrap,list,inp}};
+  const pick=v=>{closeCombo();silent=true;inp.value=v;inp.dispatchEvent(new Event("input",{bubbles:true}));silent=false};
+  const items=()=>[...list.querySelectorAll("li[data-k],li[data-free]")];
+  const mark=n=>{const a=items();a.forEach(x=>x.classList.remove("act"));act=a.length?(n+a.length)%a.length:-1;if(a[act]){a[act].classList.add("act");a[act].scrollIntoView({block:"nearest"})}};
+  inp.addEventListener("focus",()=>open(true));
+  inp.addEventListener("click",()=>{if(!OPEN||OPEN.inp!==inp)open(true)});
+  inp.addEventListener("input",()=>{if(silent)return;if(OPEN&&OPEN.inp===inp)draw(false);else open(false)});
+  inp.addEventListener("keydown",e=>{
+    if(e.key==="ArrowDown"){e.preventDefault();if(!OPEN||OPEN.inp!==inp)open(true);mark(act+1)}
+    else if(e.key==="ArrowUp"){e.preventDefault();if(OPEN&&OPEN.inp===inp)mark(act-1)}
+    else if(e.key==="Enter"){if(OPEN&&OPEN.inp===inp){e.preventDefault();const li=items()[act];if(li&&li.dataset.k!=null)pick(list._rows[+li.dataset.k].v);else closeCombo()}}
+    else if(e.key==="Escape"||e.key==="Tab")closeCombo()});
+  ar.addEventListener("pointerdown",e=>{e.preventDefault();if(OPEN&&OPEN.inp===inp)closeCombo();else{inp.focus();open(true)}});
+  list.addEventListener("mousedown",e=>e.preventDefault());
+  list.addEventListener("click",e=>{const li=e.target.closest("li");if(!li||li.classList.contains("none"))return;if(li.dataset.free)pick(inp.value.trim());else pick(list._rows[+li.dataset.k].v)})}
 const NOLOC=new Set(["bus","blood"]);
 const DISTRICTS=["Alappuzha","Ernakulam","Idukki","Kannur","Kasaragod","Kollam","Kottayam","Kozhikode","Malappuram","Palakkad","Pathanamthitta","Thiruvananthapuram","Thrissur","Wayanad"];
-$("#dist-list2").innerHTML=DISTRICTS.map(d=>`<option value="${d}">`).join("");
+combo($("#bd"),DISTRICTS,{all:"All districts"});
 const WD=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const t12=t=>{if(!t)return"";const[h,m]=t.split(":").map(Number);return((h%12)||12)+":"+String(m).padStart(2,"0")+" "+(h<12?"AM":"PM")};
 function parseMeta(d){
@@ -346,8 +404,8 @@ function addBusRow(x,r){
   const row=box.lastElementChild;row.querySelector(".bp").value=r.p||"";row.querySelector(".bm").value=r.t||""}
 function setBusRows(x,rows){
   $("#"+x+"-rows").innerHTML="";(rows&&rows.length?rows:[{}]).forEach(r=>addBusRow(x,r))}
-const hoursHTML=x=>`<div id="${x}-hrs" style="display:none"><div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:var(--mut)">Opening time<input id="${x}-open" type="time"></label><label style="flex:1;font-size:12px;color:var(--mut)">Closing time<input id="${x}-close" type="time"></label></div><select id="${x}-off"><option value="">Weekly off: none</option>${WD.map(d=>`<option value="${d}">Weekly off: ${d}</option>`).join("")}</select></div><div id="${x}-bus" style="display:none"><div class="bt-h"><span>Place</span><span>Time</span><span></span></div><div id="${x}-rows"></div><button type="button" class="btn alt sm" id="${x}-addrow" style="margin-top:10px">+ Add row</button></div><div id="${x}-blood" style="display:none"><input id="${x}-dist" list="dist-list" placeholder="District (tap or type to search)" maxlength="60" autocomplete="off" style="width:100%;margin-top:10px"><datalist id="dist-list">${DISTRICTS.map(d=>`<option value="${d}">`).join("")}</datalist><select id="${x}-grp" style="width:100%;margin-top:10px"><option value="">Blood group</option>${["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(g=>`<option value="${g}">${g}</option>`).join("")}</select></div>`;
-const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),b=$("#"+x+"-bus"),t=()=>{h.style.display=c.value==="shop"?"block":"none";b.style.display=c.value==="bus"?"block":"none";[$("#"+x+"-find"),$("#"+x+"-loc")].forEach(el=>{if(el&&el.parentElement)el.parentElement.style.display=NOLOC.has(c.value)?"none":""});const hide=({bus:["name","phone","addr"],blood:["addr","detail"]})[c.value]||[];["name","phone","addr","detail"].forEach(k=>{const el=$("#"+x+"-"+k);if(el)el.style.display=hide.includes(k)?"none":""});$("#"+x+"-blood").style.display=c.value==="blood"?"block":"none";const setPh=(k,v)=>{const el=$("#"+x+"-"+k);if(el){if(!el.dataset.ph)el.dataset.ph=el.placeholder;el.placeholder=v||el.dataset.ph}};setPh("detail",c.value==="bus"?"Bus name (e.g. KSRTC Fast Passenger)":"");setPh("name",c.value==="blood"?"Donor name":"");setPh("phone",c.value==="blood"?"Contact number":"")};c.onchange=t;t();
+const hoursHTML=x=>`<div id="${x}-hrs" style="display:none"><div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:var(--mut)">Opening time<input id="${x}-open" type="time"></label><label style="flex:1;font-size:12px;color:var(--mut)">Closing time<input id="${x}-close" type="time"></label></div><select id="${x}-off"><option value="">Weekly off: none</option>${WD.map(d=>`<option value="${d}">Weekly off: ${d}</option>`).join("")}</select></div><div id="${x}-bus" style="display:none"><div class="bt-h"><span>Place</span><span>Time</span><span></span></div><div id="${x}-rows"></div><button type="button" class="btn alt sm" id="${x}-addrow" style="margin-top:10px">+ Add row</button></div><div id="${x}-blood" style="display:none"><input id="${x}-dist" placeholder="District (tap to choose or type to search)" maxlength="60" autocomplete="off" style="width:100%;margin-top:10px"><select id="${x}-grp" style="width:100%;margin-top:10px"><option value="">Blood group</option><option value="Blood Bank">Blood Bank</option>${["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(g=>`<option value="${g}">${g}</option>`).join("")}</select></div>`;
+const wireHours=x=>{const c=$("#"+x+"-cat"),h=$("#"+x+"-hrs"),b=$("#"+x+"-bus"),t=()=>{h.style.display=c.value==="shop"?"block":"none";b.style.display=c.value==="bus"?"block":"none";[$("#"+x+"-find"),$("#"+x+"-loc")].forEach(el=>{if(el&&el.parentElement)el.parentElement.style.display=NOLOC.has(c.value)?"none":""});const hide=({bus:["name","phone","addr"],blood:["addr","detail"]})[c.value]||[];["name","phone","addr","detail"].forEach(k=>{const el=$("#"+x+"-"+k);if(el)el.style.display=hide.includes(k)?"none":""});$("#"+x+"-blood").style.display=c.value==="blood"?"block":"none";const setPh=(k,v)=>{const el=$("#"+x+"-"+k);if(el){if(!el.dataset.ph)el.dataset.ph=el.placeholder;el.placeholder=v||el.dataset.ph}};setPh("detail",c.value==="bus"?"Bus name (e.g. KSRTC Fast Passenger)":"");setPh("name",c.value==="blood"?"Donor name":"");setPh("phone",c.value==="blood"?"Contact number":"")};const dd=$("#"+x+"-dist");if(dd&&!dd.closest(".combo"))combo(dd,DISTRICTS);const gg=$("#"+x+"-grp");if(gg)gg.onchange=()=>{const nm=$("#"+x+"-name");if(nm&&c.value==="blood")nm.placeholder=gg.value==="Blood Bank"?"Blood bank name":"Donor name"};c.onchange=t;t();
   const box=$("#"+x+"-rows");
   if(!box.children.length)setBusRows(x);
   $("#"+x+"-addrow").onclick=()=>addBusRow(x);
@@ -658,7 +716,7 @@ function openEdit(p){
     <div class="locrow"><span id="e-loc"></span><button class="btn alt sm" id="e-gps">Use my GPS</button></div>
     <div class="err" id="e-err"></div>
     <div class="two"><button class="btn alt" id="e-cancel">Cancel</button><button class="btn" id="e-save">Save</button></div>`);
-  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";{const m=parseMeta(p.detail);$("#e-detail").value=m.text;$("#e-open").value=m.o;$("#e-close").value=m.c;$("#e-off").value=m.w}wireHours("e");setBusRows("e",parseMeta(p.detail).rows);{const m=parseMeta(p.detail);const[dd="",gg=""]=m.bl.split("^");$("#e-dist").value=dd;$("#e-grp").value=gg}
+  $("#e-cat").value=p.category;$("#e-name").value=p.name||"";$("#e-phone").value=p.phone||"";{const m=parseMeta(p.detail);$("#e-detail").value=m.text;$("#e-open").value=m.o;$("#e-close").value=m.c;$("#e-off").value=m.w}wireHours("e");setBusRows("e",parseMeta(p.detail).rows);{const m=parseMeta(p.detail);const[dd="",gg=""]=m.bl.split("^");$("#e-dist").value=dd;$("#e-grp").value=gg;$("#e-grp").onchange()}
   if(p.category==="bus")fetch(`${URL_}/rest/v1/bus_times?select=place,depart_time&place_id=eq.${p.id}&order=depart_time.asc`,{headers:{apikey:KEY}}).then(r=>r.ok?r.json():[]).then(rows=>{if(rows.length)setBusRows("e",rows.map(x=>({p:x.place,t:x.depart_time})))}).catch(()=>{});{const m=parseMeta(p.detail);if(p.category==="bus"&&!m.text&&m.rows[0]&&m.rows[0].n)$("#e-detail").value=m.rows[0].n}$("#e-addr").value=p.address||"";
   let eLoc={lat:p.lat,lon:p.lon},ePlace="",eImg=null;
   if(p.image_url){const v=$("#e-pv");v.src=p.image_url;v.style.display="block"}else $("#e-pk").textContent="📷 Add a photo (optional)";
